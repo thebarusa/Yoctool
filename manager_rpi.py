@@ -56,17 +56,27 @@ class RpiManager:
         """Show or hide the RPi tab"""
         if not self.tab or not self.notebook: return
         
-        tab_id = str(self.tab)
-        existing_tabs = self.notebook.tabs()
-        
-        if visible:
-            # Check if already added
-            if tab_id not in existing_tabs:
+        try:
+             # Check current state (normal, disabled, or hidden)
+             current_state = self.notebook.tab(self.tab, "state")
+             is_hidden = (current_state == "hidden")
+        except tk.TclError:
+             # If TclError, it means the tab is not managed at all (forgotten)
+             is_hidden = True
+
+        if visible and is_hidden:
+            # If we want it visible and it's currently hidden, show it.
+            # 'state'='normal' might work, or add() again.
+            # Using add() is safest if it was forgotten. 
+            # If it was just hidden, add() might re-add it or unhide it.
+            # Let's try explicit state change if it exists, otherwise add.
+            try:
+                self.notebook.tab(self.tab, state="normal")
+            except tk.TclError:
                 self.notebook.add(self.tab, text="Raspberry Pi Options")
-        else:
-            # Hide it
-            if tab_id in existing_tabs:
-                self.notebook.hide(self.tab)
+                
+        elif not visible and not is_hidden:
+            self.notebook.hide(self.tab)
 
     def parse_config(self, content):
         """Parse local.conf content to update UI state"""
