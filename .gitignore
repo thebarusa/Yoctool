@@ -1,2 +1,19 @@
 *.pyc
 __pycache__
+*.toc
+build/
+dist/
+*.spec
+*.log
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+
+# User config
+.yocto_tool_config
+
+# PyInstaller warnings
+warn-*.txt
+xref-*.html
