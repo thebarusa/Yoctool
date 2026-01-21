@@ -51,8 +51,12 @@ class YoctoBuilderApp:
         
         # Add trace to update canvas when progress changes
         self.build_progress.trace_add("write", self._update_progress_canvas)
+        
+        # Config file for saving path
+        self.config_file = os.path.expanduser("~/.yocto_tool_config")
 
         self.create_widgets()
+        self.load_saved_path()  # Load saved path after widgets are created
         self.log(f"Tool running as root. Build user: {self.sudo_user}")
         self.log(f"Tool running as root. Build user: {self.sudo_user}")
 
@@ -181,6 +185,9 @@ class YoctoBuilderApp:
         # Create rectangle and text items (will be updated by trace)
         self.pb_rect = self.pb_canvas.create_rectangle(0, 0, 0, 25, fill="#4CAF50", outline="")
         self.pb_text = self.pb_canvas.create_text(0, 12, text="0%", font=("Arial", 10, "bold"), fill="black")
+        
+        # Bind to Configure event to update position when canvas is resized
+        self.pb_canvas.bind("<Configure>", lambda e: self._update_progress_canvas())
 
     def _update_progress_canvas(self, *args):
         """Update the progress bar canvas when percentage changes."""
@@ -228,9 +235,59 @@ class YoctoBuilderApp:
         self.log_area.insert(tk.END, msg + "\n")
         self.log_area.see(tk.END)
 
+    def load_saved_path(self):
+        """Load the last used poky path from config file."""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    saved_path = f.read().strip()
+                if saved_path and os.path.exists(saved_path):
+                    self.poky_path.set(saved_path)
+                    self.log(f"Loaded saved path: {saved_path}")
+                    self.auto_load_config()
+        except Exception as e:
+            pass  # Silently ignore errors
+    
+    def save_poky_path(self):
+        """Save the current poky path to config file."""
+        try:
+            path = self.poky_path.get()
+            if path:
+                with open(self.config_file, 'w') as f:
+                    f.write(path)
+        except Exception as e:
+            pass  # Silently ignore errors
+    
+    def auto_load_config(self):
+        """Auto-load config if local.conf exists."""
+        try:
+            conf = self.get_conf_path()
+            if os.path.exists(conf):
+                # Call load_config without showing error messages
+                with open(conf, 'r') as f: content = f.read()
+                
+                m = re.search(r'^\s*MACHINE\s*\?{0,2}=\s*"(.*?)"', content, re.MULTILINE)
+                if m: self.machine_var.set(m.group(1))
+
+                m = re.search(r'^\s*PACKAGE_CLASSES\s*\?{0,2}=\s*"(.*?)"', content, re.MULTILINE)
+                if m: self.pkg_format_var.set(m.group(1).split()[0])
+
+                self.feat_debug_tweaks.set("debug-tweaks" in content)
+                self.feat_ssh_server.set("ssh-server-openssh" in content or "openssh" in content)
+                self.feat_tools_debug.set("tools-debug" in content)            
+                self.rpi_manager.parse_config(content)
+                self.update_ui_visibility()
+                
+                self.log("Config auto-loaded")
+        except Exception as e:
+            pass  # Silently ignore if config doesn't exist or is invalid
+
     def browse_folder(self):
         f = filedialog.askdirectory()
-        if f: self.poky_path.set(f)
+        if f:
+            self.poky_path.set(f)
+            self.save_poky_path()
+            self.auto_load_config()
 
     def get_conf_path(self):
         return os.path.join(self.poky_path.get(), self.build_dir_name.get(), "conf", "local.conf")
@@ -615,6 +672,8 @@ class YoctoBuilderApp:
                 self.root.after(0, self.lbl_dl_status.config, {"text": "Download Complete!", "foreground": "green"})
                 self.root.after(0, self.pb_dl.config, {"value": 100})
                 self.root.after(0, self.poky_path.set, target_dir)
+                self.root.after(0, self.save_poky_path)  # Save the downloaded path
+                self.root.after(0, self.auto_load_config)  # Auto-load config if exists
                 self.root.after(0, messagebox.showinfo, "Success", f"Successfully cloned Poky ({branch})!", parent=top)
                 self.root.after(0, top.destroy)
             else:
