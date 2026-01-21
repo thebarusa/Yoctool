@@ -45,6 +45,13 @@ class YoctoBuilderApp:
         # RPi Manager
         self.rpi_manager = manager_rpi.RpiManager(self)
 
+        # Progress Variables
+        self.build_progress = tk.DoubleVar()
+        self.build_progress_text = tk.StringVar(value="0%")
+        
+        # Add trace to update canvas when progress changes
+        self.build_progress.trace_add("write", self._update_progress_canvas)
+
         self.create_widgets()
         self.log(f"Tool running as root. Build user: {self.sudo_user}")
         self.log(f"Tool running as root. Build user: {self.sudo_user}")
@@ -135,8 +142,12 @@ class YoctoBuilderApp:
         frame_ops = ttk.Frame(self.root)
         frame_ops.pack(fill="x", padx=10, pady=5)
 
+        # Top: Build + Flash
+        frame_top = ttk.Frame(frame_ops)
+        frame_top.pack(side="top", fill="x", expand=True)
+
         # Left: Build
-        frame_build = ttk.LabelFrame(frame_ops, text="3. Build Operations")
+        frame_build = ttk.LabelFrame(frame_top, text="3. Build Operations")
         frame_build.pack(side="left", fill="both", expand=True, padx=(0, 5))
         
         f_build_btns = ttk.Frame(frame_build)
@@ -147,7 +158,7 @@ class YoctoBuilderApp:
         self.btn_clean.pack(side="left", padx=10)
 
         # Right: Flash
-        frame_flash = ttk.LabelFrame(frame_ops, text="4. Flash to SD Card")
+        frame_flash = ttk.LabelFrame(frame_top, text="4. Flash to SD Card")
         frame_flash.pack(side="left", fill="both", expand=True, padx=(5, 0))
         
         f_flash_ctrl = ttk.Frame(frame_flash)
@@ -160,7 +171,39 @@ class YoctoBuilderApp:
         self.btn_flash = ttk.Button(f_flash_ctrl, text="FLASH", command=self.flash_image)
         self.btn_flash.pack(side="left", padx=10)
 
-    # Legacy separate setup methods removed/merged above
+        # Bottom: Progress Bar (Canvas)
+        frame_progress = ttk.Frame(frame_ops)
+        frame_progress.pack(side="top", fill="x", padx=0, pady=(5, 10))
+        
+        self.pb_canvas = tk.Canvas(frame_progress, height=25, bg="#e0e0e0", highlightthickness=1, highlightbackground="#999")
+        self.pb_canvas.pack(fill="x", expand=True)
+        
+        # Create rectangle and text items (will be updated by trace)
+        self.pb_rect = self.pb_canvas.create_rectangle(0, 0, 0, 25, fill="#4CAF50", outline="")
+        self.pb_text = self.pb_canvas.create_text(0, 12, text="0%", font=("Arial", 10, "bold"), fill="black")
+
+    def _update_progress_canvas(self, *args):
+        """Update the progress bar canvas when percentage changes."""
+        try:
+            percent = self.build_progress.get()
+            percent = max(0, min(100, percent))  # Clamp to 0-100
+            
+            # Update canvas width based on current size
+            canvas_width = self.pb_canvas.winfo_width()
+            if canvas_width <= 1:  # Canvas not yet rendered
+                canvas_width = 400  # Default fallback
+            
+            bar_width = (canvas_width * percent) / 100
+            
+            # Update rectangle
+            self.pb_canvas.coords(self.pb_rect, 0, 0, bar_width, 25)
+            
+            # Update text
+            text = f"{int(percent)}%"
+            self.pb_canvas.itemconfig(self.pb_text, text=text)
+            self.pb_canvas.coords(self.pb_text, canvas_width / 2, 12)
+        except:
+            pass  # Ignore errors during initialization
 
     def _setup_log_section(self):
         frame_log = ttk.LabelFrame(self.root, text="5. Terminal Log")
@@ -340,7 +383,14 @@ class YoctoBuilderApp:
         # Using shell=True here is necessary because we are invoking a complex bash command.
         # safe_poky/safe_build help mitigate injection if they contained malicious shell chars.
         
+        # Using shell=True here is necessary because we are invoking a complex bash command.
+        # safe_poky/safe_build help mitigate injection if they contained malicious shell chars.
+        
         proc = subprocess.Popen(full_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        
+        # Reset progress
+        self.root.after(0, self.build_progress.set, 0)
+        self.root.after(0, self.build_progress_text.set, "0%")
         
         # Read stdout safely
         while True:
@@ -350,7 +400,19 @@ class YoctoBuilderApp:
             if line:
                 self.log(line.strip())
                 
+                # Parse progress: "Running task 123 of 456 (...)"
+                m = re.search(r'Running task (\d+) of (\d+)', line)
+                if m:
+                    current = int(m.group(1))
+                    total = int(m.group(2))
+                    if total > 0:
+                        percent = (current / total) * 100
+                        self.root.after(0, self.build_progress.set, percent)
+                        self.root.after(0, self.build_progress_text.set, f"{int(percent)}%")
+                
         if proc.returncode == 0: 
+            self.root.after(0, self.build_progress.set, 100)
+            self.root.after(0, self.build_progress_text.set, "100%") 
             self.root.after(0, messagebox.showinfo, "Success", "Done!")
         else: 
             self.root.after(0, messagebox.showerror, "Error", "Failed!")
@@ -377,11 +439,20 @@ class YoctoBuilderApp:
         
         if messagebox.askyesno("Flash", f"Flash {os.path.basename(img)} to {dev}?"):
             self.set_busy_state(True)
-            threading.Thread(target=self.run_flash, args=(img, dev)).start() # Fixed: removed btn_flash disabling here, handled in busy state
+            try:
+                img_size = os.path.getsize(img)
+            except:
+                img_size = 0
+            threading.Thread(target=self.run_flash, args=(img, dev, img_size)).start()
 
-    def run_flash(self, img, dev):
+    def run_flash(self, img, dev, img_size):
         try:
             self.log("Flashing...")
+            
+            # Reset progress
+            self.root.after(0, self.build_progress.set, 0)
+            self.root.after(0, self.build_progress_text.set, "0%")
+            
             # Unmount all partitions from that device
             subprocess.run(f"umount {shlex.quote(dev)}*", shell=True)
             
@@ -401,8 +472,20 @@ class YoctoBuilderApp:
                 if "bytes" in line: 
                     # send to main thread
                     self.log_overwrite(f">> {line.strip()}")
+                    
+                    # Parse "123456789 bytes (123 MB, 118 MiB) copied"
+                    # We just need the first number
+                    parts = line.split()
+                    if parts and parts[0].isdigit() and img_size > 0:
+                        bytes_copied = int(parts[0])
+                        percent = (bytes_copied / img_size) * 100
+                        percent = min(percent, 100) # Cap at 100
+                        self.root.after(0, self.build_progress.set, percent)
+                        self.root.after(0, self.build_progress_text.set, f"{int(percent)}%")
             
             if proc.returncode == 0: 
+                self.root.after(0, self.build_progress.set, 100)
+                self.root.after(0, self.build_progress_text.set, "100%")
                 self.root.after(0, messagebox.showinfo, "Success", "Flashed!")
         except Exception as e: 
             self.root.after(0, messagebox.showerror, "Error", str(e))
