@@ -1,15 +1,17 @@
 import tkinter as tk
 from tkinter import ttk
 import re
+import os
 
 class RpiManager:
     def __init__(self, root_app):
-        """
-        root_app: Reference to the main application (for accessing root window if needed, or just callbacks)
-        """
+        self.root_app = root_app
         self.root = root_app.root if hasattr(root_app, 'root') else root_app
         
-        # Variables
+        # --- 1. Supported Machines ---
+        self.machines = ["raspberrypi0-wifi", "raspberrypi3", "raspberrypi4", "raspberrypi5"]
+
+        # --- UI Variables ---
         self.rpi_usb_gadget = tk.BooleanVar(value=False)
         self.rpi_enable_uart = tk.BooleanVar(value=True)
         self.license_commercial = tk.BooleanVar(value=True)
@@ -21,10 +23,40 @@ class RpiManager:
         self.tab = None
         self.notebook = None
 
+    # --- Interface for YoctoTool ---
+
+    def is_current_machine_supported(self):
+        """Check if the currently selected machine belongs to this manager"""
+        return self.root_app.machine_var.get() in self.machines
+
+    def get_required_layers(self):
+        """
+        Return list of layers needed for this board.
+        Format: list of tuples (folder_name, git_url)
+        """
+        return [
+            ("meta-openembedded", "https://git.openembedded.org/meta-openembedded"),
+            ("meta-raspberrypi", "https://git.yoctoproject.org/meta-raspberrypi")
+        ]
+
+    def get_bblayers_lines(self):
+        """
+        Return list of lines to append to bblayers.conf
+        """
+        # Note: We use relative paths assuming layers are inside poky/
+        return [
+            'BBLAYERS += "${TOPDIR}/../meta-openembedded/meta-oe"\n',
+            'BBLAYERS += "${TOPDIR}/../meta-openembedded/meta-python"\n',
+            'BBLAYERS += "${TOPDIR}/../meta-openembedded/meta-networking"\n',
+            'BBLAYERS += "${TOPDIR}/../meta-openembedded/meta-multimedia"\n',
+            'BBLAYERS += "${TOPDIR}/../meta-raspberrypi"\n'
+        ]
+
+    # --- UI & Config Logic ---
+
     def create_tab(self, notebook):
         self.notebook = notebook
         self.tab = ttk.Frame(notebook)
-        # Initially add it, but we might hide it later
         notebook.add(self.tab, text="Raspberry Pi Options")
         
         tab_rpi = self.tab
@@ -53,33 +85,18 @@ class RpiManager:
             else: self.frame_wifi.grid_remove()
 
     def set_visible(self, visible):
-        """Show or hide the RPi tab"""
         if not self.tab or not self.notebook: return
-        
         try:
-             # Check current state (normal, disabled, or hidden)
+             # Logic to hide/show tab based on machine selection
              current_state = self.notebook.tab(self.tab, "state")
              is_hidden = (current_state == "hidden")
-        except tk.TclError:
-             # If TclError, it means the tab is not managed at all (forgotten)
-             is_hidden = True
-
-        if visible and is_hidden:
-            # If we want it visible and it's currently hidden, show it.
-            # 'state'='normal' might work, or add() again.
-            # Using add() is safest if it was forgotten. 
-            # If it was just hidden, add() might re-add it or unhide it.
-            # Let's try explicit state change if it exists, otherwise add.
-            try:
+             if visible and is_hidden:
                 self.notebook.tab(self.tab, state="normal")
-            except tk.TclError:
-                self.notebook.add(self.tab, text="Raspberry Pi Options")
-                
-        elif not visible and not is_hidden:
-            self.notebook.hide(self.tab)
+             elif not visible and not is_hidden:
+                self.notebook.hide(self.tab)
+        except: pass
 
     def parse_config(self, content):
-        """Parse local.conf content to update UI state"""
         self.rpi_usb_gadget.set("dtoverlay=dwc2" in content)
         self.rpi_enable_uart.set('ENABLE_UART = "1"' in content)
         self.license_commercial.set("commercial" in content)
@@ -92,13 +109,10 @@ class RpiManager:
             if wpass: self.wifi_password.set(wpass.group(1))
         else:
             self.rpi_enable_wifi.set(False)
-        
         self.toggle_wifi_fields()
 
     def get_config_lines(self):
-        """Return list of configuration lines for local.conf"""
         lines = []
-        
         val = "1" if self.rpi_enable_uart.get() else "0"
         lines.append(f'ENABLE_UART = "{val}"\n')
 
@@ -116,5 +130,4 @@ class RpiManager:
             lines.append('IMAGE_INSTALL:append = " wpa-supplicant linux-firmware-rpidistro-bcm43430"\n')
             lines.append(f'WIFI_SSID = "{self.wifi_ssid.get()}"\n')
             lines.append(f'WIFI_PASSWORD = "{self.wifi_password.get()}"\n')
-            
         return lines
