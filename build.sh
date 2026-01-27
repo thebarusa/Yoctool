@@ -3,16 +3,15 @@
 set -e
 
 echo "=================================="
-echo "Yocto Tool Build Script"
+echo "Yoctool Build Script"
 echo "=================================="
 
 # ---------------------------------------------------------
 # Step 1: Determine Version & Name
 # ---------------------------------------------------------
 # Nếu có BUILD_VERSION từ CI thì dùng, nếu không thì mặc định là v1.0.0
-# Lưu ý: Ta KHÔNG dùng sed để sửa code, mà chỉ đổi tên file exe đầu ra.
 VERSION=${BUILD_VERSION:-"v1.0.0"}
-EXE_NAME="YoctoTool_${VERSION}"
+EXE_NAME="Yoctool_${VERSION}"
 
 echo ">> Target Version: $VERSION"
 echo ">> Output Filename: $EXE_NAME"
@@ -46,9 +45,11 @@ pip install pyinstaller requests
 echo "Cleaning old build files..."
 rm -rf build dist __pycache__
 rm -f yocto_tool.spec
+rm -f yoctool.spec
 
 echo "Building executable..."
-# PyInstaller sẽ tạo file có tên nằm trong biến $EXE_NAME (ví dụ YoctoTool_v1.0.0)
+# PyInstaller sẽ tạo file có tên nằm trong biến $EXE_NAME (ví dụ Yoctool_v1.0.0)
+# Lưu ý: Script chính giờ là main_yoctool.py
 pyinstaller --onefile \
     --name="$EXE_NAME" \
     --add-data="manager_rpi.py:." \
@@ -56,7 +57,7 @@ pyinstaller --onefile \
     --windowed \
     --clean \
     --icon=NONE \
-    yocto_tool.py
+    main_yoctool.py
 
 # ---------------------------------------------------------
 # Step 5: Teardown & Verify

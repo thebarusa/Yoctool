@@ -1,4 +1,4 @@
-name: Build and Release YoctoTool (Linux)
+name: Build and Release Yoctool (Linux)
 
 on:
   push:
@@ -28,11 +28,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y zip
 
-      # --- THAY ĐỔI QUAN TRỌNG Ở ĐÂY ---
       - name: Run build.sh
         env:
           # Truyền tên Tag (ví dụ v1.0.0) vào biến môi trường BUILD_VERSION
-          # Nếu không phải tag (ví dụ PR), dùng short SHA
           BUILD_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
         run: |
           chmod +x build.sh
@@ -42,14 +40,14 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          # Tên file mong đợi: YoctoTool_v1.0.0
-          EXE_NAME="YoctoTool_${TAG_NAME}"
+          # Tên file mong đợi: Yoctool_v1.0.0
+          EXE_NAME="Yoctool_${TAG_NAME}"
           
           cd dist
           # Kiểm tra file có tồn tại không
           if [ -f "$EXE_NAME" ]; then
-              zip -r "YoctoTool-Linux-${TAG_NAME}.zip" "$EXE_NAME"
-              echo "Packaging completed: YoctoTool-Linux-${TAG_NAME}.zip"
+              zip -r "Yoctool-Linux-${TAG_NAME}.zip" "$EXE_NAME"
+              echo "Packaging completed: Yoctool-Linux-${TAG_NAME}.zip"
           else
               echo "Error: File $EXE_NAME not found in dist/"
               ls -la
@@ -62,13 +60,13 @@ jobs:
         with:
           files: dist/*.zip
           body: |
-            ## YoctoTool Linux Build
+            ## Yoctool Linux Build
             Version: ${{ github.ref_name }}
             
             **Installation:**
             1. Download the zip file.
             2. Extract it.
-            3. Run: `sudo ./YoctoTool_${{ github.ref_name }}`
+            3. Run: `sudo ./Yoctool_${{ github.ref_name }}`
           draft: false
           prerelease: false
         env:

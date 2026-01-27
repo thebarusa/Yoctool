@@ -9,7 +9,8 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-GITHUB_REPO = "thebarusa/YoctoTool" 
+# Cập nhật tên Repo nếu bạn cũng đổi tên trên GitHub
+GITHUB_REPO = "thebarusa/Yoctool" 
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}"
 GITHUB_RELEASE_URL = f"{GITHUB_API}/releases/latest"
 GITHUB_TOKEN = "" 
@@ -63,7 +64,7 @@ def _check_update_thread(root, current_version):
                    f"Changelog:\n{changelog}\n\n"
                    "Update now?")
             
-            if messagebox.askyesno("Update YoctoTool", msg):
+            if messagebox.askyesno("Update Yoctool", msg):
                 if download_url:
                     download_popup(root, download_url, latest_version)
                 else:
@@ -96,8 +97,8 @@ def download_popup(parent, download_url, version):
 def _download_worker(url, version, top, pb, lbl):
     try:
         tmp_dir = tempfile.gettempdir()
-        tmp_zip = os.path.join(tmp_dir, f"yocto_update_{version}.zip")
-        extract_dir = os.path.join(tmp_dir, f"yocto_extract_{version}")
+        tmp_zip = os.path.join(tmp_dir, f"yoctool_update_{version}.zip")
+        extract_dir = os.path.join(tmp_dir, f"yoctool_extract_{version}")
 
         lbl.config(text="Downloading...")
         with requests.get(url, headers=GITHUB_HEADERS, stream=True, timeout=60) as r:
@@ -129,12 +130,12 @@ def _download_worker(url, version, top, pb, lbl):
         else:
             # Fallback for raw binary
             os.makedirs(extract_dir, exist_ok=True)
-            shutil.copy(tmp_zip, os.path.join(extract_dir, "YoctoTool"))
+            shutil.copy(tmp_zip, os.path.join(extract_dir, "Yoctool"))
 
-        # Identify the new executable name (e.g. YoctoTool_v1.0.1)
+        # Identify the new executable name (e.g. Yoctool_v1.0.1)
         new_exe_name = None
         for f in os.listdir(extract_dir):
-            if f.startswith("YoctoTool"):
+            if f.startswith("Yoctool"):
                 new_exe_name = f
                 break
         
@@ -158,11 +159,11 @@ def run_linux_updater(new_dir, new_exe_name):
         # Dev mode fallback
         current_exe = os.path.abspath(sys.argv[0])
         app_dir = os.path.dirname(current_exe)
-        old_exe_name = "yocto_tool.py"
-        new_exe_name = "yocto_tool.py" # In dev, likely just overwriting
+        old_exe_name = "main_yoctool.py"
+        new_exe_name = "main_yoctool.py" 
         restart_cmd = f'python3 "{os.path.join(app_dir, new_exe_name)}" &'
 
-    script_path = os.path.join(tempfile.gettempdir(), "yocto_updater.sh")
+    script_path = os.path.join(tempfile.gettempdir(), "yoctool_updater.sh")
     
     # Bash script to delete old version, copy new one, and restart
     bash_content = f"""#!/bin/bash

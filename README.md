@@ -1,4 +1,4 @@
-# Yocto Tool v14
+# Yoctool
 
 A comprehensive GUI tool for managing Yocto Project builds, specifically designed for Raspberry Pi targets and other embedded systems.
 

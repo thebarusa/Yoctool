@@ -11,15 +11,15 @@ import json
 import manager_rpi
 import manager_update
 
-class YoctoBuilderApp:
+class YoctoolApp:
     def __init__(self, root):
         self.root = root
         
         # --- VERSION LOGIC ---
-        # Get version dynamically from filename (e.g. YoctoTool_v1.0.0 -> v1.0.0)
+        # Get version dynamically from filename (e.g. Yoctool_v1.0.0 -> v1.0.0)
         self.APP_VERSION = self.get_version_from_filename()
         
-        self.root.title(f"Yocto Tool {self.APP_VERSION}")
+        self.root.title(f"Yoctool {self.APP_VERSION}")
         self.root.geometry("900x950")
 
         self.poky_path = tk.StringVar()
@@ -52,7 +52,7 @@ class YoctoBuilderApp:
         self.build_progress_text = tk.StringVar(value="0%")
         self.build_progress.trace_add("write", self._update_progress_canvas)
         
-        self.config_file = os.path.expanduser("~/.yocto_tool_config")
+        self.config_file = os.path.expanduser("~/.yoctool_config")
 
         self.create_menu()
         self.create_widgets()
@@ -66,8 +66,8 @@ class YoctoBuilderApp:
         # Check if running as compiled executable
         if getattr(sys, 'frozen', False):
             exe_name = os.path.basename(sys.executable)
-            # Regex to find version in filename (e.g., YoctoTool_v1.0.0)
-            match = re.search(r'YoctoTool_(v\d+\.\d+\.\d+)', exe_name)
+            # Regex to find version in filename (e.g., Yoctool_v1.0.0)
+            match = re.search(r'Yoctool_(v\d+\.\d+\.\d+)', exe_name)
             if match:
                 version = match.group(1)
         
@@ -87,7 +87,7 @@ class YoctoBuilderApp:
         manager_update.check_for_update(self.root, self.APP_VERSION)
 
     def show_about(self):
-        messagebox.showinfo("About", f"Yocto Tool\nVersion: {self.APP_VERSION}\nAuthor: Hungnt8687")
+        messagebox.showinfo("About", f"Yoctool\nVersion: {self.APP_VERSION}\nAuthor: Hungnt8687")
 
     def create_widgets(self):
         self._setup_path_section()
@@ -242,7 +242,7 @@ class YoctoBuilderApp:
         return os.path.join(self.poky_path.get(), self.build_dir_name.get(), "conf", "local.conf")
     
     def get_tool_conf_path(self):
-        return os.path.join(self.poky_path.get(), self.build_dir_name.get(), "conf", "yocto_tool.conf")
+        return os.path.join(self.poky_path.get(), self.build_dir_name.get(), "conf", "yoctool.conf")
 
     def auto_load_config(self):
         self.load_config()
@@ -319,10 +319,10 @@ class YoctoBuilderApp:
             skip_block = False
 
             for line in lines:
-                if "# --- YOCTO TOOL AUTO CONFIG START" in line:
+                if "# --- YOCTOOL AUTO CONFIG START" in line:
                     skip_block = True
                     continue
-                if "# --- YOCTO TOOL AUTO CONFIG END" in line:
+                if "# --- YOCTOOL AUTO CONFIG END" in line:
                     skip_block = False
                     continue
                 if skip_block: continue
@@ -339,7 +339,7 @@ class YoctoBuilderApp:
             clean_lines.append(f'MACHINE ??= "{self.machine_var.get()}"\n')
             clean_lines.append(f'PACKAGE_CLASSES ?= "{self.pkg_format_var.get()}"\n')
             
-            clean_lines.append("\n# --- YOCTO TOOL AUTO CONFIG START ---\n")
+            clean_lines.append("\n# --- YOCTOOL AUTO CONFIG START ---\n")
             
             if self.init_system_var.get() == "systemd":
                 clean_lines.append('DISTRO_FEATURES:append = " systemd"\n')
@@ -357,7 +357,7 @@ class YoctoBuilderApp:
                     clean_lines.extend(mgr.get_config_lines())
                     self.update_bblayers(mgr)
 
-            clean_lines.append("# --- YOCTO TOOL AUTO CONFIG END ---\n")
+            clean_lines.append("# --- YOCTOOL AUTO CONFIG END ---\n")
 
             with open(conf, 'w') as f:
                 f.writelines(clean_lines)
@@ -378,7 +378,7 @@ class YoctoBuilderApp:
             with open(tool_conf, 'w') as f:
                 json.dump(app_state, f, indent=4)
 
-            self.log("Configuration saved to local.conf & yocto_tool.conf")
+            self.log("Configuration saved to local.conf & yoctool.conf")
             messagebox.showinfo("Success", "Configuration Applied & Saved!")
             
         except Exception as e: messagebox.showerror("Error", str(e))
@@ -402,7 +402,7 @@ class YoctoBuilderApp:
             
             if needs_update:
                 with open(bblayers_conf, 'a') as f:
-                    f.write('\n# Auto-added by Yocto Tool\n')
+                    f.write('\n# Auto-added by Yoctool\n')
                     for line in lines_to_add:
                         f.write(line)
                 self.log("Updated bblayers.conf")
@@ -675,5 +675,5 @@ if __name__ == "__main__":
         sys.exit(0)
 
     root = tk.Tk()
-    app = YoctoBuilderApp(root)
+    app = YoctoolApp(root)
     root.mainloop()
