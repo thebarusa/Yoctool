@@ -186,11 +186,16 @@ class YoctoolApp:
         
         f_flash_ctrl = ttk.Frame(frame_flash)
         f_flash_ctrl.pack(pady=15, padx=10, fill="x")
-        self.drive_menu = ttk.Combobox(f_flash_ctrl, textvariable=self.selected_drive, width=25, state="readonly")
+        self.drive_menu = ttk.Combobox(f_flash_ctrl, textvariable=self.selected_drive, width=20, state="readonly")
         self.drive_menu.pack(side="left", padx=5, fill="x", expand=True)
         ttk.Button(f_flash_ctrl, text="↻", width=3, command=self.scan_drives).pack(side="left", padx=2)
+        
+        self.btn_format = ttk.Button(f_flash_ctrl, text="FORMAT", command=self.format_drive)
+        self.btn_format.pack(side="left", padx=5)
+        
         self.btn_flash = ttk.Button(f_flash_ctrl, text="FLASH", command=self.flash_image)
         self.btn_flash.pack(side="left", padx=5)
+        
         self.btn_extract = ttk.Button(f_flash_ctrl, text="EXTRACT LOGS", command=self.extract_logs)
         self.btn_extract.pack(side="left", padx=5)
 
@@ -410,6 +415,7 @@ class YoctoolApp:
         state = "disabled" if busy else "normal"
         self.btn_build.config(state=state)
         self.btn_clean.config(state=state)
+        self.btn_format.config(state=state)
         self.btn_flash.config(state=state)
         self.btn_load.config(state=state)
         self.btn_save.config(state=state)
@@ -531,6 +537,53 @@ class YoctoolApp:
             if devs: self.drive_menu.current(0)
         except: pass
 
+    def format_drive(self):
+        sel = self.selected_drive.get()
+        if not sel or "No devices" in sel: return
+        dev = f"/dev/{sel.split()[0]}"
+        
+        if messagebox.askyesno("Format Drive", f"DEEP WIPE & FORMAT {dev}?\nALL DATA WILL BE DESTROYED!"):
+            self.set_busy_state(True)
+            threading.Thread(target=self.run_format, args=(dev,)).start()
+
+    def run_format(self, dev):
+        try:
+            self.log(f"Starting FORMAT (FAT32) on {dev}...")
+            
+            # Helper to run commands and capture errors
+            def run_step(desc, cmd, ignore_error=False):
+                self.log(desc)
+                p = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                if p.returncode != 0 and not ignore_error:
+                    raise Exception(f"Command '{cmd}' failed.\nStderr: {p.stderr}")
+            
+            run_step("1/5: Unmounting...", f"umount {shlex.quote(dev)}*", ignore_error=True)
+            
+            run_step("2/5: Wiping signatures...", f"wipefs -a --force {shlex.quote(dev)}")
+            
+            run_step("3/5: Creating Partition Table...", f"parted -s {shlex.quote(dev)} mklabel msdos")
+            
+            run_step("4/5: Creating FAT32 Partition...", f"parted -s {shlex.quote(dev)} mkpart primary fat32 1MiB 100%")
+            
+            self.log("Waiting for partition table update...")
+            subprocess.run("udevadm settle", shell=True)
+            import time; time.sleep(1) # Grace period
+            
+            # Predict partition name
+            if dev[-1].isdigit(): part_dev = f"{dev}p1" # e.g. mmcblk0 -> mmcblk0p1
+            else: part_dev = f"{dev}1" # e.g. sdb -> sdb1
+            
+            run_step(f"5/5: Formatting {part_dev}...", f"mkfs.vfat -F 32 -n 'YOCTOOL' {shlex.quote(part_dev)}")
+            
+            self.root.after(0, messagebox.showinfo, "Success", "Format Complete! Drive is now FAT32.")
+            self.log("Format Complete.")
+            
+        except Exception as e:
+            self.log(f"Format Error: {e}")
+            self.root.after(0, lambda: messagebox.showerror("Error", f"Format failed:\n{str(e)}"))
+        finally:
+            self.root.after(0, self.set_busy_state, False)
+
     def flash_image(self):
         sel = self.selected_drive.get()
         if not sel or "No devices" in sel: return
@@ -549,11 +602,15 @@ class YoctoolApp:
 
     def run_flash(self, img, dev, img_size):
         try:
-            self.log("Flashing...")
+            self.log("Preparing to flash...")
+            
+            # Simple Unmount for safety before flashing
+            subprocess.run(f"umount {shlex.quote(dev)}*", shell=True, stderr=subprocess.DEVNULL)
+            
+            self.log(f"Flashing {os.path.basename(img)}...")
             self.root.after(0, self.build_progress.set, 0)
             self.root.after(0, self.build_progress_text.set, "0%")
             
-            subprocess.run(f"umount {shlex.quote(dev)}*", shell=True)
             safe_img = shlex.quote(img)
             safe_dev = shlex.quote(dev)
             

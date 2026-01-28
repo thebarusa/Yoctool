@@ -117,6 +117,7 @@ class RpiManager:
         os.makedirs(files_dir, exist_ok=True)
         os.makedirs(os.path.join(layer_path, "conf"), exist_ok=True)
 
+        # 1. Create Layer Config
         with open(os.path.join(layer_path, "conf", "layer.conf"), "w") as f:
             f.write('BBPATH .= ":${LAYERDIR}"\n')
             f.write('BBFILES += "${LAYERDIR}/recipes-*/*/*.bb \\\n')
@@ -129,6 +130,7 @@ class RpiManager:
         ssid = self.wifi_ssid.get()
         psk = self.wifi_password.get()
 
+        # 2. Create Netplan Config
         netplan_content = f"""network:
   version: 2
   renderer: networkd
@@ -147,21 +149,101 @@ class RpiManager:
         with open(os.path.join(files_dir, "50-cloud-init.yaml"), "w") as f:
             f.write(netplan_content)
 
+        # 3. Create Firmware Fix Script (The Magic Fix)
+        script_content = """#!/bin/sh
+# Aggressive Firmware Fixer for Pi Zero W
+FW_DIR="/lib/firmware/brcm"
+
+# Function to link if source exists and target doesn't
+link_firmware() {
+    SRC=$1
+    DST=$2
+    if [ -f "$SRC" ] && [ ! -L "$DST" ] && [ ! -f "$DST" ]; then
+        ln -sf "$SRC" "$DST"
+        echo "Fixed: Linked $SRC to $DST"
+    fi
+}
+
+# 1. Fix BIN file
+# Find any file containing '43430' and 'bin', excluding the target name itself
+BIN_SRC=$(find $FW_DIR -name "*43430*sdio*.bin" ! -name "brcmfmac43430-sdio.bin" | head -n 1)
+if [ -n "$BIN_SRC" ]; then
+    link_firmware "$BIN_SRC" "$FW_DIR/brcmfmac43430-sdio.bin"
+fi
+
+# 2. Fix TXT file (Most critical)
+TXT_SRC=$(find $FW_DIR -name "*43430*sdio*.txt" ! -name "brcmfmac43430-sdio.txt" | head -n 1)
+if [ -n "$TXT_SRC" ]; then
+    link_firmware "$TXT_SRC" "$FW_DIR/brcmfmac43430-sdio.txt"
+fi
+
+# 3. Fix CLM_BLOB
+CLM_SRC=$(find $FW_DIR -name "*43430*sdio*.clm_blob" ! -name "brcmfmac43430-sdio.clm_blob" | head -n 1)
+if [ -n "$CLM_SRC" ]; then
+    link_firmware "$CLM_SRC" "$FW_DIR/brcmfmac43430-sdio.clm_blob"
+fi
+
+# Reload driver to apply changes
+modprobe -r brcmfmac
+modprobe brcmfmac
+"""
+        with open(os.path.join(files_dir, "fix-wifi.sh"), "w") as f:
+            f.write(script_content)
+
+        # 4. Create Systemd Service for the script
+        service_content = """[Unit]
+Description=Fix Broadcom WiFi Firmware
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/fix-wifi.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+"""
+        with open(os.path.join(files_dir, "fix-wifi.service"), "w") as f:
+            f.write(service_content)
+
+        # 5. Create Bitbake Recipe
         recipe_content = """
-SUMMARY = "Configure WiFi using Netplan and setup persistent logging"
+SUMMARY = "Configure WiFi using Netplan and fix RPi Zero W firmware"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-SRC_URI = "file://50-cloud-init.yaml"
+SRC_URI = "file://50-cloud-init.yaml \\
+           file://fix-wifi.sh \\
+           file://fix-wifi.service"
 
 S = "${WORKDIR}"
 
+inherit systemd
+
+SYSTEMD_SERVICE:${PN} = "fix-wifi.service"
+SYSTEMD_AUTO_ENABLE = "enable"
+
+# Ensure firmware packages are present
+RDEPENDS:${PN} += "linux-firmware-rpidistro-bcm43430 linux-firmware-bcm43430"
+
 do_install() {
+    # Install Netplan config
     install -d ${D}${sysconfdir}/netplan
     install -m 600 ${WORKDIR}/50-cloud-init.yaml ${D}${sysconfdir}/netplan/50-cloud-init.yaml
+
+    # Install Fix Script
+    install -d ${D}${bindir}
+    install -m 0755 ${WORKDIR}/fix-wifi.sh ${D}${bindir}/fix-wifi.sh
+
+    # Install Service
+    install -d ${D}${systemd_unitdir}/system
+    install -m 0644 ${WORKDIR}/fix-wifi.service ${D}${systemd_unitdir}/system/fix-wifi.service
 }
 
-FILES:${PN} += "${sysconfdir}/netplan/50-cloud-init.yaml"
+FILES:${PN} += "${sysconfdir}/netplan/50-cloud-init.yaml \\
+                ${bindir}/fix-wifi.sh \\
+                ${systemd_unitdir}/system/fix-wifi.service"
 """
         with open(os.path.join(recipe_dir, "wifi-netplan-config_1.0.bb"), "w") as f:
             f.write(recipe_content)
@@ -190,7 +272,8 @@ FILES:${PN} += "${sysconfdir}/netplan/50-cloud-init.yaml"
             lines.append('VIRTUAL-RUNTIME_initscripts = "systemd-compat-units"\n')
             lines.append('IMAGE_INSTALL:append = " netplan wifi-netplan-config"\n')
             lines.append('IMAGE_INSTALL:append = " kernel-module-brcmfmac"\n')
-            # Fix: Use generic firmware instead of rpidistro to avoid kernel conflict
+            # Install BOTH upstream and rpidistro firmware to ensure files exist
+            lines.append('IMAGE_INSTALL:append = " linux-firmware-rpidistro-bcm43430"\n')
             lines.append('IMAGE_INSTALL:append = " linux-firmware-bcm43430"\n')
             lines.append('IMAGE_INSTALL:append = " wireless-regdb-static"\n')
 
