@@ -188,6 +188,10 @@ FILES:${PN} += "${sysconfdir}/netplan/50-cloud-init.yaml"
             lines.append('VIRTUAL-RUNTIME_init_manager = "systemd"\n')
             lines.append('DISTRO_FEATURES_BACKFILL_CONSIDERED = "sysvinit"\n')
             lines.append('VIRTUAL-RUNTIME_initscripts = "systemd-compat-units"\n')
-            lines.append('IMAGE_INSTALL:append = " netplan wifi-netplan-config linux-firmware-rpidistro-bcm43430"\n')
+            lines.append('IMAGE_INSTALL:append = " netplan wifi-netplan-config"\n')
+            lines.append('IMAGE_INSTALL:append = " kernel-module-brcmfmac"\n')
+            # Fix: Use generic firmware instead of rpidistro to avoid kernel conflict
+            lines.append('IMAGE_INSTALL:append = " linux-firmware-bcm43430"\n')
+            lines.append('IMAGE_INSTALL:append = " wireless-regdb-static"\n')
 
         return lines

@@ -15,8 +15,6 @@ class YoctoolApp:
     def __init__(self, root):
         self.root = root
         
-        # --- VERSION LOGIC ---
-        # Get version dynamically from filename (e.g. Yoctool_v1.0.0 -> v1.0.0)
         self.APP_VERSION = self.get_version_from_filename()
         
         self.root.title(f"Yoctool {self.APP_VERSION}")
@@ -60,13 +58,10 @@ class YoctoolApp:
         self.log(f"Tool running as root. Build user: {self.sudo_user}")
 
     def get_version_from_filename(self):
-        # Default fallback for development
         version = "v1.0.0"
         
-        # Check if running as compiled executable
         if getattr(sys, 'frozen', False):
             exe_name = os.path.basename(sys.executable)
-            # Regex to find version in filename (e.g., Yoctool_v1.0.0)
             match = re.search(r'Yoctool_(v\d+\.\d+\.\d+)', exe_name)
             if match:
                 version = match.group(1)
@@ -195,7 +190,9 @@ class YoctoolApp:
         self.drive_menu.pack(side="left", padx=5, fill="x", expand=True)
         ttk.Button(f_flash_ctrl, text="↻", width=3, command=self.scan_drives).pack(side="left", padx=2)
         self.btn_flash = ttk.Button(f_flash_ctrl, text="FLASH", command=self.flash_image)
-        self.btn_flash.pack(side="left", padx=10)
+        self.btn_flash.pack(side="left", padx=5)
+        self.btn_extract = ttk.Button(f_flash_ctrl, text="EXTRACT LOGS", command=self.extract_logs)
+        self.btn_extract.pack(side="left", padx=5)
 
         frame_progress = ttk.Frame(frame_ops)
         frame_progress.pack(side="top", fill="x", padx=0, pady=(5, 10))
@@ -416,6 +413,7 @@ class YoctoolApp:
         self.btn_flash.config(state=state)
         self.btn_load.config(state=state)
         self.btn_save.config(state=state)
+        self.btn_extract.config(state=state)
 
     def exec_stream_cmd(self, cmd_args, cwd=None):
         try:
@@ -584,6 +582,55 @@ class YoctoolApp:
             self.root.after(0, messagebox.showerror, "Error", str(e))
         finally: 
              self.root.after(0, self.set_busy_state, False)
+
+    def extract_logs(self):
+        sel = self.selected_drive.get()
+        if not sel or "No devices" in sel: return
+        
+        dev_name = sel.split()[0]
+        dev_path = f"/dev/{dev_name}"
+        
+        if "mmcblk" in dev_name: part_path = f"{dev_path}p2"
+        else: part_path = f"{dev_path}2"
+
+        mount_point = "/tmp/yoctool_mnt"
+        os.makedirs(mount_point, exist_ok=True)
+
+        try:
+            self.log(f"Mounting {part_path} to {mount_point}...")
+            subprocess.run(f"mount {part_path} {mount_point}", shell=True, check=True)
+            
+            initial_dir = os.path.join(mount_point, "var/log/journal")
+            if not os.path.exists(initial_dir): initial_dir = mount_point
+            
+            src_file = filedialog.askopenfilename(title="Select system.journal file", 
+                                                initialdir=initial_dir,
+                                                filetypes=[("Journal files", "*.journal"), ("All files", "*.*")])
+            
+            if src_file:
+                real_user = os.environ.get('SUDO_USER') or os.environ.get('USER')
+                home_dir = f"/home/{real_user}" if real_user and real_user != "root" else os.path.expanduser("~")
+                
+                dest_file = filedialog.asksaveasfilename(title="Save Log As",
+                                                       initialdir=home_dir,
+                                                       defaultextension=".txt",
+                                                       filetypes=[("Text files", "*.txt")])
+                if dest_file:
+                    self.log(f"Converting {src_file} to {dest_file}...")
+                    cmd = f"journalctl --file={shlex.quote(src_file)} --no-pager > {shlex.quote(dest_file)}"
+                    subprocess.run(cmd, shell=True, check=True)
+                    
+                    if real_user and real_user != "root":
+                        subprocess.run(f"chown {real_user}:{real_user} {shlex.quote(dest_file)}", shell=True)
+                        
+                    self.log("Log extracted successfully.")
+                    messagebox.showinfo("Success", f"Log extracted to {dest_file}")
+
+        except Exception as e:
+            self.log(f"Error extracting logs: {e}")
+            messagebox.showerror("Error", f"Failed: {e}")
+        finally:
+            subprocess.run(f"umount {mount_point}", shell=True)
 
     def open_download_dialog(self):
         top = tk.Toplevel(self.root)
