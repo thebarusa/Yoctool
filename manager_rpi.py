@@ -148,7 +148,7 @@ Conflicts=wpa_supplicant.service
 [Service]
 Type=simple
 ExecStartPre=/bin/sh -c '/usr/bin/killall wpa_supplicant || true'
-ExecStart=/bin/sh -c '/usr/sbin/wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -dd && echo "WPA started, waiting 15s for connection..." && sleep 15 && echo "Requesting DHCP IP..." && udhcpc -i wlan0 -n -q -x hostname:raspberrypi0-wifi && echo "DHCP Finished. IP Status:" && ip a show wlan0 && echo "Gateway Status:" && ip route && echo "Starting PING to 8.8.8.8..." && ping -c 10 8.8.8.8; tail -f /dev/null'
+ExecStart=/bin/sh -c '/usr/sbin/wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -dd && echo "WPA started, waiting 15s for connection..." && sleep 15 && echo "Requesting DHCP IP..." && udhcpc -i wlan0 -n -q -x hostname:raspberrypi0-wifi && echo "DHCP Finished. IP Status:" && ip a show wlan0 && echo "Starting PING to 8.8.8.8..." && ping -c 5 8.8.8.8; tail -f /dev/null'
 Restart=always
 RestartSec=5
 
@@ -208,7 +208,8 @@ FILES:${PN} += "${sysconfdir}/wpa_supplicant/wpa_supplicant.conf \\
             lines.append('DISTRO_FEATURES_BACKFILL_CONSIDERED = "sysvinit"\n')
             lines.append('VIRTUAL-RUNTIME_initscripts = "systemd-compat-units"\n')
             
-            lines.append('IMAGE_INSTALL:append = " wpa-supplicant iw linux-firmware-rpidistro-bcm43430 kernel-module-brcmfmac kernel-module-brcmfmac-wcc wpa-config wireless-regdb-static"\n')
+            lines.append('IMAGE_INSTALL:append = " wpa-supplicant iw linux-firmware-rpidistro-bcm43430 kernel-module-brcmfmac kernel-module-brcmfmac-wcc wpa-config wireless-regdb-static avahi-daemon"\n')
+            
             lines.append('KERNEL_MODULE_AUTOLOAD:append = " brcmfmac-wcc"\n')
             lines.append('CMDLINE:append = " brcmfmac.feature_disable=0x200000"\n')
             
