@@ -10,6 +10,7 @@ class RpiManager:
 
         self.machines = ["raspberrypi0-wifi", "raspberrypi3", "raspberrypi4", "raspberrypi5"]
 
+        # --- Variables ---
         self.rpi_hostname = tk.StringVar(value="raspberrypi-yocto")
         self.rpi_username = tk.StringVar(value="root")
         self.rpi_password = tk.StringVar(value="root")
@@ -22,7 +23,7 @@ class RpiManager:
         self.wifi_ssid = tk.StringVar()
         self.wifi_password = tk.StringVar()
 
-        self.frame_wifi = None
+        self.frame_wifi_auth = None
         self.tab = None
         self.notebook = None
 
@@ -48,46 +49,74 @@ class RpiManager:
         notebook.add(self.tab, text="Raspberry Pi Options")
 
         tab_rpi = self.tab
-
-        frame_id = ttk.LabelFrame(tab_rpi, text="System Identification")
-        frame_id.grid(row=0, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
-
-        ttk.Label(frame_id, text="Hostname:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        ttk.Entry(frame_id, textvariable=self.rpi_hostname, width=30).grid(row=0, column=1, padx=5, pady=5, sticky="w")
-
-        ttk.Label(frame_id, text="User (non-root):").grid(row=1, column=0, padx=5, pady=5, sticky="e")
-        ttk.Entry(frame_id, textvariable=self.rpi_username, width=30).grid(row=1, column=1, padx=5, pady=5, sticky="w")
         
-        ttk.Label(frame_id, text="Password:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
-        ttk.Entry(frame_id, textvariable=self.rpi_password, width=30).grid(row=2, column=1, padx=5, pady=5, sticky="w")
+        # Configure Grid Weight (Chia cot 50-50)
+        tab_rpi.columnconfigure(0, weight=1)
+        tab_rpi.columnconfigure(1, weight=1)
+
+        # ============================================================
+        # GROUP 1: SYSTEM & USER (LEFT COLUMN)
+        # ============================================================
+        frame_sys = ttk.LabelFrame(tab_rpi, text=" 1. System Identity & User ")
+        frame_sys.grid(row=0, column=0, padx=10, pady=5, sticky="nsew")
+
+        # Hostname
+        ttk.Label(frame_sys, text="Hostname:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        ttk.Entry(frame_sys, textvariable=self.rpi_hostname, width=25).grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        # Username
+        ttk.Label(frame_sys, text="Username:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        ttk.Entry(frame_sys, textvariable=self.rpi_username, width=25).grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+        # Password
+        ttk.Label(frame_sys, text="Password:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        ttk.Entry(frame_sys, textvariable=self.rpi_password, width=25).grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+        # Note
+        lbl_note = ttk.Label(frame_sys, text="(User 'root' skips creation)", font=("Arial", 8, "italic"), foreground="gray")
+        lbl_note.grid(row=3, column=1, sticky="w", padx=5, pady=(0, 5))
+
+        # ============================================================
+        # GROUP 2: HARDWARE & FEATURES (RIGHT COLUMN)
+        # ============================================================
+        frame_hw = ttk.LabelFrame(tab_rpi, text=" 2. Hardware & Drivers ")
+        frame_hw.grid(row=0, column=1, padx=10, pady=5, sticky="nsew")
+
+        ttk.Checkbutton(frame_hw, text="Enable UART Console (Serial)", variable=self.rpi_enable_uart).grid(row=0, column=0, sticky="w", padx=10, pady=2)
+        ttk.Checkbutton(frame_hw, text="Enable USB Gadget Mode (SSH via USB)", variable=self.rpi_usb_gadget).grid(row=1, column=0, sticky="w", padx=10, pady=2)
+        ttk.Checkbutton(frame_hw, text="Enable Persistent Logs (Save to SD)", variable=self.persistent_logs).grid(row=2, column=0, sticky="w", padx=10, pady=2)
+        ttk.Separator(frame_hw, orient="horizontal").grid(row=3, column=0, sticky="ew", pady=5)
+        ttk.Checkbutton(frame_hw, text="Accept Commercial Licenses (Codecs/Firmware)", variable=self.license_commercial).grid(row=4, column=0, sticky="w", padx=10, pady=2)
+
+        # ============================================================
+        # GROUP 3: CONNECTIVITY (BOTTOM - FULL WIDTH)
+        # ============================================================
+        frame_net = ttk.LabelFrame(tab_rpi, text=" 3. Wireless Connectivity ")
+        frame_net.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+
+        # Master Checkbox
+        chk_wifi = ttk.Checkbutton(frame_net, text="Enable Wi-Fi Configuration", variable=self.rpi_enable_wifi, command=self.toggle_wifi_fields)
+        chk_wifi.pack(anchor="w", padx=10, pady=5)
+
+        # Auth Fields (Hidden by default)
+        self.frame_wifi_auth = ttk.Frame(frame_net)
+        self.frame_wifi_auth.pack(fill="x", padx=20, pady=(0, 10))
+
+        ttk.Label(self.frame_wifi_auth, text="SSID (Network Name):").pack(side="left")
+        ttk.Entry(self.frame_wifi_auth, textvariable=self.wifi_ssid, width=25).pack(side="left", padx=5)
         
-        ttk.Label(frame_id, text="(Leave User as 'root' to skip creating extra user)").grid(row=3, column=1, sticky="w", padx=5)
+        ttk.Label(self.frame_wifi_auth, text="Password:").pack(side="left", padx=(15, 0))
+        ttk.Entry(self.frame_wifi_auth, textvariable=self.wifi_password, width=25, show="*").pack(side="left", padx=5)
 
-        frame_hw = ttk.Frame(tab_rpi)
-        frame_hw.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-
-        ttk.Checkbutton(frame_hw, text="Enable USB Gadget Mode (SSH over USB)", variable=self.rpi_usb_gadget).grid(row=0, column=0, sticky="w")
-        ttk.Checkbutton(frame_hw, text="Enable UART Console", variable=self.rpi_enable_uart).grid(row=1, column=0, sticky="w")
-        ttk.Checkbutton(frame_hw, text="Accept Commercial Licenses", variable=self.license_commercial).grid(row=2, column=0, sticky="w")
-        ttk.Checkbutton(frame_hw, text="Enable Persistent Logging", variable=self.persistent_logs).grid(row=3, column=0, sticky="w")
-
-        ttk.Checkbutton(tab_rpi, text="Enable Wi-Fi (wpa_supplicant)", variable=self.rpi_enable_wifi, command=self.toggle_wifi_fields).grid(row=2, column=0, padx=10, pady=10, sticky="w")
-
-        self.frame_wifi = ttk.Frame(tab_rpi)
-        self.frame_wifi.grid(row=3, column=0, columnspan=2, padx=20, pady=0, sticky="w")
-        ttk.Label(self.frame_wifi, text="SSID:").pack(side="left")
-        ttk.Entry(self.frame_wifi, textvariable=self.wifi_ssid, width=20).pack(side="left", padx=5)
-        ttk.Label(self.frame_wifi, text="Password:").pack(side="left", padx=5)
-        ttk.Entry(self.frame_wifi, textvariable=self.wifi_password, width=20, show="*").pack(side="left", padx=5)
-
+        # Initialize visibility state
         self.toggle_wifi_fields()
 
     def toggle_wifi_fields(self):
-        if self.frame_wifi:
+        if self.frame_wifi_auth:
             if self.rpi_enable_wifi.get():
-                self.frame_wifi.grid()
+                self.frame_wifi_auth.pack(fill="x", padx=20, pady=(0, 10))
             else:
-                self.frame_wifi.grid_remove()
+                self.frame_wifi_auth.pack_forget()
 
     def set_visible(self, visible):
         if not self.tab or not self.notebook:
@@ -232,16 +261,13 @@ FILES:${PN} += "${sysconfdir}/wpa_supplicant/wpa_supplicant.conf \\
     def get_config_lines(self):
         lines = []
         
-        # --- FIX: Chuyen lenh set hostname thanh one-line command de tranh loi Parser ---
         hostname = self.rpi_hostname.get().strip()
         if hostname:
             lines.append(f'hostname:pn-base-files = "{hostname}"\n')
-            # Dung lenh echo truc tiep, khong tao function
             cmd_host = f"echo {hostname} > ${{IMAGE_ROOTFS}}/etc/hostname;"
             cmd_hosts_1 = f"echo 127.0.0.1 localhost > ${{IMAGE_ROOTFS}}/etc/hosts;"
             cmd_hosts_2 = f"echo 127.0.1.1 {hostname} >> ${{IMAGE_ROOTFS}}/etc/hosts;"
             
-            # Noi cac lenh lai va gan vao ROOTFS_POSTPROCESS_COMMAND
             lines.append(f'ROOTFS_POSTPROCESS_COMMAND += "{cmd_host} {cmd_hosts_1} {cmd_hosts_2}"\n')
 
         user = self.rpi_username.get().strip()
