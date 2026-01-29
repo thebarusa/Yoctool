@@ -139,22 +139,39 @@ network={{
         with open(os.path.join(files_dir, "wpa_supplicant.conf"), "w") as f:
             f.write(wpa_conf.strip() + "\n")
 
+        network_conf = """
+[Match]
+Name=wlan0
+
+[Network]
+DHCP=yes
+"""
+        with open(os.path.join(files_dir, "80-wifi.network"), "w") as f:
+            f.write(network_conf.strip() + "\n")
+
         with open(os.path.join(recipe_dir, "wpa-config_1.0.bb"), "w") as f:
             f.write("""
-SUMMARY = "WPA Supplicant configuration"
+SUMMARY = "WPA Supplicant and Networkd configuration"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-SRC_URI = "file://wpa_supplicant.conf"
+SRC_URI = "file://wpa_supplicant.conf \\
+           file://80-wifi.network"
 
 S = "${WORKDIR}"
+
+inherit systemd
 
 do_install() {
     install -d ${D}${sysconfdir}/wpa_supplicant
     install -m 600 ${WORKDIR}/wpa_supplicant.conf ${D}${sysconfdir}/wpa_supplicant/wpa_supplicant.conf
+
+    install -d ${D}${sysconfdir}/systemd/network
+    install -m 644 ${WORKDIR}/80-wifi.network ${D}${sysconfdir}/systemd/network/80-wifi.network
 }
 
-FILES:${PN} += "${sysconfdir}/wpa_supplicant/wpa_supplicant.conf"
+FILES:${PN} += "${sysconfdir}/wpa_supplicant/wpa_supplicant.conf \\
+                ${sysconfdir}/systemd/network/80-wifi.network"
 """)
 
     def get_config_lines(self):
