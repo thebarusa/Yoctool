@@ -139,39 +139,51 @@ network={{
         with open(os.path.join(files_dir, "wpa_supplicant.conf"), "w") as f:
             f.write(wpa_conf.strip() + "\n")
 
-        network_conf = """
-[Match]
-Name=wlan0
+        debug_service = """
+[Unit]
+Description=Auto WPA Supplicant Debug Mode with DHCP
+After=syslog.target network.target
+Conflicts=wpa_supplicant.service
 
-[Network]
-DHCP=yes
+[Service]
+Type=simple
+ExecStartPre=/bin/sh -c '/usr/bin/killall wpa_supplicant || true'
+ExecStart=/bin/sh -c '/usr/sbin/wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -dd && echo "WPA started, waiting 15s for connection..." && sleep 15 && echo "Requesting DHCP IP..." && udhcpc -i wlan0 -n -q -x hostname:raspberrypi0-wifi && echo "DHCP Finished. IP Status:" && ip a show wlan0 && echo "Gateway Status:" && ip route && echo "Starting PING to 8.8.8.8..." && ping -c 10 8.8.8.8; tail -f /dev/null'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
 """
-        with open(os.path.join(files_dir, "80-wifi.network"), "w") as f:
-            f.write(network_conf.strip() + "\n")
+        with open(os.path.join(files_dir, "wpa-debug.service"), "w") as f:
+            f.write(debug_service.strip() + "\n")
 
         with open(os.path.join(recipe_dir, "wpa-config_1.0.bb"), "w") as f:
             f.write("""
-SUMMARY = "WPA Supplicant and Networkd configuration"
+SUMMARY = "WPA Supplicant Custom Configuration & Debug Service"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = "file://wpa_supplicant.conf \\
-           file://80-wifi.network"
+           file://wpa-debug.service"
 
 S = "${WORKDIR}"
 
 inherit systemd
 
+SYSTEMD_SERVICE:${PN} = "wpa-debug.service"
+SYSTEMD_AUTO_ENABLE:${PN} = "enable"
+
 do_install() {
     install -d ${D}${sysconfdir}/wpa_supplicant
     install -m 600 ${WORKDIR}/wpa_supplicant.conf ${D}${sysconfdir}/wpa_supplicant/wpa_supplicant.conf
 
-    install -d ${D}${sysconfdir}/systemd/network
-    install -m 644 ${WORKDIR}/80-wifi.network ${D}${sysconfdir}/systemd/network/80-wifi.network
+    install -d ${D}${systemd_system_unitdir}
+    install -m 644 ${WORKDIR}/wpa-debug.service ${D}${systemd_system_unitdir}/wpa-debug.service
 }
 
 FILES:${PN} += "${sysconfdir}/wpa_supplicant/wpa_supplicant.conf \\
-                ${sysconfdir}/systemd/network/80-wifi.network"
+                ${systemd_system_unitdir}/wpa-debug.service"
 """)
 
     def get_config_lines(self):
