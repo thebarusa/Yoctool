@@ -321,16 +321,18 @@ class YoctoolApp:
             skip_block = False
 
             for line in lines:
-                if "# --- YOCTOOL AUTO CONFIG START" in line:
+                if "# --- YOCTOOL AUTO CONFIG START" in line or "# --- YOCTO TOOL AUTO CONFIG START" in line:
                     skip_block = True
                     continue
-                if "# --- YOCTOOL AUTO CONFIG END" in line:
+                if "# --- YOCTOOL AUTO CONFIG END" in line or "# --- YOCTO TOOL AUTO CONFIG END" in line:
                     skip_block = False
                     continue
                 if skip_block: continue
 
                 if re.match(r'^\s*MACHINE\s*\?{0,2}=', line): continue
                 if re.match(r'^\s*PACKAGE_CLASSES\s*\?{0,2}=', line): continue
+                if re.match(r'^\s*DISTRO_FEATURES:append\s*=', line): continue
+                if re.match(r'^\s*VIRTUAL-RUNTIME_init_manager\s*=', line): continue
                 if "ENABLE_UART" in line: continue
                 
                 clean_lines.append(line)
@@ -344,7 +346,7 @@ class YoctoolApp:
             clean_lines.append("\n# --- YOCTOOL AUTO CONFIG START ---\n")
             
             if self.init_system_var.get() == "systemd":
-                clean_lines.append('DISTRO_FEATURES:append = " systemd"\n')
+                clean_lines.append('DISTRO_FEATURES:append = " systemd usrmerge"\n')
                 clean_lines.append('VIRTUAL-RUNTIME_init_manager = "systemd"\n')
 
             features = []
@@ -559,7 +561,6 @@ class YoctoolApp:
             subprocess.run(f"umount -f {dev}*", shell=True, stderr=subprocess.DEVNULL)
             subprocess.run(f"swapoff {dev}*", shell=True, stderr=subprocess.DEVNULL)
             
-            # Buoc quan trong nhat: Ghi de sector dau tien de huy bang phan vung loi
             run_step("Nuking Partition Table...", f"dd if=/dev/zero of={shlex.quote(dev)} bs=512 count=2048 status=none conv=fsync")
             
             subprocess.run(f"wipefs -a --force {shlex.quote(dev)}", shell=True, stderr=subprocess.DEVNULL)
@@ -617,7 +618,6 @@ class YoctoolApp:
         try:
             self.log("Preparing to flash...")
             
-            # Simple Unmount for safety before flashing
             subprocess.run(f"umount {shlex.quote(dev)}*", shell=True, stderr=subprocess.DEVNULL)
             
             self.log(f"Flashing {os.path.basename(img)}...")
@@ -645,7 +645,6 @@ class YoctoolApp:
                         self.root.after(0, self.build_progress_text.set, f"{int(percent)}%")
             
             if proc.returncode == 0: 
-                # Force kernel to re-read partition table so new partitions appear immediately
                 self.log("Refreshing partition table...")
                 subprocess.run(f"partprobe {safe_dev}", shell=True)
                 subprocess.run("udevadm settle", shell=True)

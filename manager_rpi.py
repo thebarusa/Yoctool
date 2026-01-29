@@ -163,6 +163,7 @@ FILES:${PN} += "${sysconfdir}/wpa_supplicant/wpa_supplicant.conf"
 
         if self.license_commercial.get():
             lines.append('LICENSE_FLAGS_ACCEPTED:append = " commercial"\n')
+            lines.append('LICENSE_FLAGS_ACCEPTED:append = " commercial synaptics-killswitch"\n')
 
         if self.rpi_usb_gadget.get():
             lines.append('RPI_EXTRA_CONFIG:append = "dtoverlay=dwc2"\n')
@@ -174,11 +175,12 @@ FILES:${PN} += "${sysconfdir}/wpa_supplicant/wpa_supplicant.conf"
 
         if self.rpi_enable_wifi.get():
             self.generate_wpa_config()
-            lines.append('DISTRO_FEATURES:append = " systemd wifi"\n')
+
+            lines.append('DISTRO_FEATURES:append = " systemd wifi usrmerge"\n')
             lines.append('VIRTUAL-RUNTIME_init_manager = "systemd"\n')
             lines.append('DISTRO_FEATURES_BACKFILL_CONSIDERED = "sysvinit"\n')
             lines.append('VIRTUAL-RUNTIME_initscripts = "systemd-compat-units"\n')
-            lines.append('RPI_EXTRA_CONFIG:append = "dtoverlay=sdio,poll_once=off"\n')
-            lines.append('IMAGE_INSTALL:append = " wpa-supplicant iw linux-firmware-bcm43430 kernel-module-brcmfmac wpa-config"\n')
 
+            lines.append('IMAGE_INSTALL:append = " wpa-supplicant iw linux-firmware-rpidistro-bcm43430 kernel-module-brcmfmac wpa-config wireless-regdb-static ${@bb.utils.contains(\'DISTRO_FEATURES\', \'kernel6\', \'kernel-module-brcmfmac-wcc\' ,\'\', d)}"\n')
+            
         return lines
