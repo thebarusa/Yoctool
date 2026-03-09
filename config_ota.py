@@ -217,12 +217,6 @@ RREPLACES:${PN} += "rauc-conf"
 
 S = "${WORKDIR}"
 
-inherit deploy
-
-do_compile() {
-    dd if=/dev/zero of=${WORKDIR}/uboot.env bs=1024 count=16
-}
-
 do_install() {
     install -d ${D}${sysconfdir}/rauc
     install -m 644 ${WORKDIR}/system.conf ${D}${sysconfdir}/rauc/system.conf
@@ -231,15 +225,40 @@ do_install() {
     install -m 644 ${WORKDIR}/fw_env.config ${D}${sysconfdir}/fw_env.config
 }
 
-do_deploy() {
-    install -m 644 ${WORKDIR}/uboot.env ${DEPLOYDIR}/uboot.env
-}
-
-addtask deploy after do_compile before do_build
-
 FILES:${PN} += "${sysconfdir}/rauc/system.conf ${sysconfdir}/fw_env.config"
 """
         with open(os.path.join(rauc_recipe_dir, "rpi-rauc-conf_1.0.bb"), "w") as f: f.write(recipe_content.strip())
+
+    def create_uboot_bbappend(self):
+        poky_dir = self.root_app.poky_path.get()
+        if not poky_dir: return
+        
+        layer_path = os.path.join(poky_dir, "meta-wifi-setup")
+        uboot_dir = os.path.join(layer_path, "recipes-bsp", "u-boot")
+        os.makedirs(uboot_dir, exist_ok=True)
+        
+        content = """
+DEPENDS += "u-boot-tools-native"
+
+do_compile:append() {
+    echo "bootlimit=3" >> ${B}/u-boot-initial-env
+    echo "bootcount=0" >> ${B}/u-boot-initial-env
+    echo "upgrade_available=0" >> ${B}/u-boot-initial-env
+    
+    echo "BOOT_ORDER=A B" >> ${B}/u-boot-initial-env
+    echo "BOOT_A_LEFT=3" >> ${B}/u-boot-initial-env
+    echo "BOOT_B_LEFT=0" >> ${B}/u-boot-initial-env
+    
+    mkenvimage -s 16384 -o ${WORKDIR}/uboot.env ${B}/u-boot-initial-env
+}
+
+do_deploy:append() {
+    install -d ${DEPLOYDIR}
+    install -m 644 ${WORKDIR}/uboot.env ${DEPLOYDIR}/uboot.env
+}
+"""
+        with open(os.path.join(uboot_dir, "u-boot_%.bbappend"), "w") as f: 
+            f.write(content.strip())
 
     def create_bundle_recipe(self):
         poky_dir = self.root_app.poky_path.get()
@@ -277,6 +296,7 @@ RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
         wks_file = self.create_wks_file()
         self.create_rauc_config()
         self.create_bundle_recipe()
+        self.create_uboot_bbappend()
         
         project_root = os.getcwd()
         key_dir = os.path.join(project_root, "rauc-keys")
