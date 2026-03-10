@@ -4,6 +4,7 @@ import os
 import subprocess
 import glob
 import threading
+import shutil
 
 class OTATab:
     def __init__(self, root_app):
@@ -91,24 +92,53 @@ class OTATab:
         
         self.root_app.log(f"Starting SCP transfer: {file_name} -> {ip}...")
         
-        cmd_scp = ["sshpass", "-p", pwd, "scp", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", bundle_file, f"{user}@{ip}:{target_path}"]
-        cmd_install = ["sshpass", "-p", pwd, "ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{ip}", f"rauc install {target_path} && reboot"]
+        cmd_scp = ["sshpass", "-p", pwd, "scp", "-v", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", bundle_file, f"{user}@{ip}:{target_path}"]
+        cmd_install = ["sshpass", "-p", pwd, "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", f"{user}@{ip}", f"rauc install {target_path} && reboot"]
         
         threading.Thread(target=self.run_scp_thread, args=(cmd_scp, cmd_install, file_name)).start()
 
     def run_scp_thread(self, cmd_scp, cmd_install, filename):
         try:
-            subprocess.run(cmd_scp, check=True, capture_output=True, text=True)
-            self.root_app.log(f"SUCCESS: {filename} uploaded.")
+            self.root_app.set_busy_state(True)
             
-            self.root_app.log("Installing update & Rebooting...")
-            subprocess.run(cmd_install, capture_output=True, text=True)
+            process = subprocess.Popen(
+                cmd_scp, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT,
+                text=True, 
+                bufsize=1, 
+                universal_newlines=True
+            )
             
-            self.root_app.root.after(0, messagebox.showinfo, "Success", f"Update installed successfully!\nDevice is rebooting into the new partition.")
-        except subprocess.CalledProcessError as e:
-            err_msg = e.stderr if e.stderr else str(e)
-            self.root_app.log(f"DEPLOY ERROR: {err_msg}")
-            self.root_app.root.after(0, messagebox.showerror, "Deploy Failed", f"Check IP/User/Pass.\nError: {err_msg}")
+            for line in process.stdout:
+                line_str = line.strip()
+                if line_str:
+                    if "Sending file modes" in line_str or "Transferred" in line_str or "Bytes per second" in line_str or "Sink" in line_str:
+                         self.root_app.log(f"[SCP] {line_str}")
+            
+            process.wait()
+            
+            if process.returncode == 0:
+                self.root_app.log(f"SUCCESS: {filename} uploaded.")
+                
+                self.root_app.log("Installing update & Rebooting. Please wait...")
+                install_process = subprocess.run(cmd_install, capture_output=True, text=True)
+                
+                if install_process.returncode == 0 or install_process.returncode == 255:
+                    self.root_app.log(f"[INSTALL] {install_process.stdout.strip()}")
+                    self.root_app.root.after(0, messagebox.showinfo, "Success", f"Update installed successfully!\nDevice is rebooting into the new partition.")
+                else:
+                    self.root_app.log(f"INSTALL ERROR: {install_process.stderr}")
+                    self.root_app.root.after(0, messagebox.showerror, "Install Failed", f"Update failed during rauc install.\nError: {install_process.stderr}")
+            else:
+                 self.root_app.log(f"SCP ERROR: Transfer failed with code {process.returncode}")
+                 self.root_app.root.after(0, messagebox.showerror, "Transfer Failed", "Failed to upload the update bundle.")
+
+        except Exception as e:
+            self.root_app.log(f"DEPLOY ERROR: {str(e)}")
+            self.root_app.root.after(0, messagebox.showerror, "Deploy Failed", f"Check IP/User/Pass.\nError: {str(e)}")
+        finally:
+            self.root_app.set_busy_state(False)
 
     def check_sshpass(self):
         from shutil import which
@@ -171,6 +201,12 @@ part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --size 128
         rauc_files_dir = os.path.join(rauc_recipe_dir, "files")
         os.makedirs(rauc_files_dir, exist_ok=True)
 
+        project_root = os.getcwd()
+        cert_src = os.path.join(project_root, "rauc-keys", "development-1.cert.pem")
+        cert_dest = os.path.join(rauc_files_dir, "development-1.cert.pem")
+        if os.path.exists(cert_src):
+            shutil.copy(cert_src, cert_dest)
+
         machine = self.root_app.tab_general.machine_var.get()
         sys_conf_content = f"""
 [system]
@@ -207,7 +243,7 @@ SUMMARY = "RPI Specific RAUC configuration"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-SRC_URI = "file://system.conf file://fw_env.config"
+SRC_URI = "file://system.conf file://fw_env.config file://development-1.cert.pem"
 
 PROVIDES += "rauc-conf virtual/rauc-conf"
 RPROVIDES:${PN} += "rauc-conf virtual-rauc-conf"
@@ -221,11 +257,15 @@ do_install() {
     install -d ${D}${sysconfdir}/rauc
     install -m 644 ${WORKDIR}/system.conf ${D}${sysconfdir}/rauc/system.conf
     
+    if [ -f ${WORKDIR}/development-1.cert.pem ]; then
+        install -m 644 ${WORKDIR}/development-1.cert.pem ${D}${sysconfdir}/rauc/development-1.cert.pem
+    fi
+    
     install -d ${D}${sysconfdir}
     install -m 644 ${WORKDIR}/fw_env.config ${D}${sysconfdir}/fw_env.config
 }
 
-FILES:${PN} += "${sysconfdir}/rauc/system.conf ${sysconfdir}/fw_env.config"
+FILES:${PN} += "${sysconfdir}/rauc/system.conf ${sysconfdir}/fw_env.config ${sysconfdir}/rauc/development-1.cert.pem"
 """
         with open(os.path.join(rauc_recipe_dir, "rpi-rauc-conf_1.0.bb"), "w") as f: f.write(recipe_content.strip())
 
@@ -260,6 +300,35 @@ do_deploy:append() {
         with open(os.path.join(uboot_dir, "u-boot_%.bbappend"), "w") as f: 
             f.write(content.strip())
 
+    def create_kernel_bbappend(self):
+        poky_dir = self.root_app.poky_path.get()
+        if not poky_dir: return
+        
+        layer_path = os.path.join(poky_dir, "meta-wifi-setup")
+        kernel_dir = os.path.join(layer_path, "recipes-kernel", "linux")
+        files_dir = os.path.join(kernel_dir, "files")
+        os.makedirs(files_dir, exist_ok=True)
+        
+        cfg_content = """
+CONFIG_BLK_DEV_LOOP=y
+CONFIG_SQUASHFS=y
+CONFIG_SQUASHFS_FILE_CACHE=y
+CONFIG_SQUASHFS_FILE_DIRECT=y
+CONFIG_SQUASHFS_DECOMP_SINGLE=y
+CONFIG_SQUASHFS_XATTR=y
+CONFIG_SQUASHFS_ZLIB=y
+CONFIG_SQUASHFS_XZ=y
+"""
+        with open(os.path.join(files_dir, "rauc.cfg"), "w") as f:
+            f.write(cfg_content.strip())
+            
+        bbappend_content = """
+FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+SRC_URI += "file://rauc.cfg"
+"""
+        with open(os.path.join(kernel_dir, "linux-raspberrypi_%.bbappend"), "w") as f:
+            f.write(bbappend_content.strip())
+
     def create_bundle_recipe(self):
         poky_dir = self.root_app.poky_path.get()
         if not poky_dir: return
@@ -279,7 +348,7 @@ inherit bundle
 RAUC_BUNDLE_COMPATIBLE = "${MACHINE}"
 RAUC_BUNDLE_VERSION = "v1"
 RAUC_BUNDLE_DESCRIPTION = "RAUC Bundle generated by Yoctool"
-RAUC_BUNDLE_FORMAT = "verity"
+RAUC_BUNDLE_FORMAT = "plain"
 
 RAUC_BUNDLE_SLOTS = "rootfs" 
 RAUC_SLOT_rootfs = "${RAUC_TARGET_IMAGE}"
@@ -288,7 +357,7 @@ RAUC_SLOT_rootfs[fstype] = "tar.gz"
 RAUC_KEY_FILE = "${RAUC_KEY_FILE_REAL}"
 RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
 """
-        with open(bundle_bb, "w") as f: f.write(content)
+        with open(bundle_bb, "w") as f: f.write(content.strip() + "\n")
 
     def get_config_lines(self):
         if not self.enable_rauc.get(): return []
@@ -297,6 +366,7 @@ RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
         self.create_rauc_config()
         self.create_bundle_recipe()
         self.create_uboot_bbappend()
+        self.create_kernel_bbappend()
         
         project_root = os.getcwd()
         key_dir = os.path.join(project_root, "rauc-keys")
@@ -320,7 +390,7 @@ RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
         lines.append('PACKAGECONFIG:append:pn-rauc = " uboot"\n')
         
         lines.append('DISTRO_FEATURES:append = " rauc"\n')
-        lines.append('IMAGE_INSTALL:append = " rauc rpi-rauc-conf libubootenv-bin"\n') 
+        lines.append('IMAGE_INSTALL:append = " rauc rpi-rauc-conf libubootenv-bin e2fsprogs-mke2fs"\n')
         
         if wks_file: lines.append(f'WKS_FILE = "{wks_file}"\n')
         
