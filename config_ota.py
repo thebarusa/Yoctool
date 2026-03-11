@@ -175,7 +175,7 @@ class OTATab:
         poky_dir = self.root_app.poky_path.get()
         if not poky_dir or not os.path.exists(poky_dir): return None
         
-        layer_path = os.path.join(poky_dir, "meta-wifi-setup")
+        layer_path = os.path.join(poky_dir, "meta-yoctool")
         wic_dir = os.path.join(layer_path, "wic")
         os.makedirs(wic_dir, exist_ok=True)
         
@@ -196,7 +196,7 @@ part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --size 128
         poky_dir = self.root_app.poky_path.get()
         if not poky_dir: return
         
-        layer_path = os.path.join(poky_dir, "meta-wifi-setup")
+        layer_path = os.path.join(poky_dir, "meta-yoctool")
         rauc_recipe_dir = os.path.join(layer_path, "recipes-core", "rauc")
         rauc_files_dir = os.path.join(rauc_recipe_dir, "files")
         os.makedirs(rauc_files_dir, exist_ok=True)
@@ -273,7 +273,7 @@ FILES:${PN} += "${sysconfdir}/rauc/system.conf ${sysconfdir}/fw_env.config ${sys
         poky_dir = self.root_app.poky_path.get()
         if not poky_dir: return
         
-        layer_path = os.path.join(poky_dir, "meta-wifi-setup")
+        layer_path = os.path.join(poky_dir, "meta-yoctool")
         uboot_dir = os.path.join(layer_path, "recipes-bsp", "u-boot")
         os.makedirs(uboot_dir, exist_ok=True)
         
@@ -304,7 +304,7 @@ do_deploy:append() {
         poky_dir = self.root_app.poky_path.get()
         if not poky_dir: return
         
-        layer_path = os.path.join(poky_dir, "meta-wifi-setup")
+        layer_path = os.path.join(poky_dir, "meta-yoctool")
         kernel_dir = os.path.join(layer_path, "recipes-kernel", "linux")
         files_dir = os.path.join(kernel_dir, "files")
         os.makedirs(files_dir, exist_ok=True)
@@ -333,7 +333,7 @@ SRC_URI += "file://rauc.cfg"
         poky_dir = self.root_app.poky_path.get()
         if not poky_dir: return
         
-        layer_path = os.path.join(poky_dir, "meta-wifi-setup")
+        layer_path = os.path.join(poky_dir, "meta-yoctool")
         recipes_dir = os.path.join(layer_path, "recipes-core", "bundles")
         os.makedirs(recipes_dir, exist_ok=True)
         

@@ -45,7 +45,7 @@ class RpiTab:
         
         # --- FIX: Thêm layer wifi tự tạo vào danh sách ---
         if self.rpi_enable_wifi.get():
-            layers.append('BBLAYERS += "${TOPDIR}/../meta-wifi-setup"\n')
+            layers.append('BBLAYERS += "${TOPDIR}/../meta-yoctool"\n')
             
         return layers
 
@@ -158,7 +158,7 @@ class RpiTab:
             return
 
         # Đường dẫn tới layer mới
-        layer_path = os.path.join(poky_dir, "meta-wifi-setup")
+        layer_path = os.path.join(poky_dir, "meta-yoctool")
         recipe_dir = os.path.join(layer_path, "recipes-connectivity", "wpa-config")
         files_dir = os.path.join(recipe_dir, "files")
 
