@@ -183,8 +183,7 @@ class OTATab:
         wks_path = os.path.join(wic_dir, wks_filename)
         size = self.rauc_slot_size.get()
         
-        content = f"""
-part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4096 --size 100
+        content = f"""part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4096 --size 100
 part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label rootfs_A --align 4096 --size {size}
 part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label rootfs_B --align 4096 --size {size}
 part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --size 128
@@ -208,8 +207,7 @@ part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --size 128
             shutil.copy(cert_src, cert_dest)
 
         machine = self.root_app.tab_general.machine_var.get()
-        sys_conf_content = f"""
-[system]
+        sys_conf_content = f"""[system]
 compatible={machine}
 bootloader=uboot
 data-directory=/var/lib/rauc
@@ -238,8 +236,7 @@ bootname=B
                 try: os.remove(old_path)
                 except: pass
 
-        recipe_content = """
-SUMMARY = "RPI Specific RAUC configuration"
+        recipe_content = """SUMMARY = "RPI Specific RAUC configuration"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
@@ -277,14 +274,17 @@ FILES:${PN} += "${sysconfdir}/rauc/system.conf ${sysconfdir}/fw_env.config ${sys
         uboot_dir = os.path.join(layer_path, "recipes-bsp", "u-boot")
         os.makedirs(uboot_dir, exist_ok=True)
         
-        content = """
-DEPENDS += "u-boot-tools-native"
+        old_boot_cmd = os.path.join(uboot_dir, "files", "boot.cmd")
+        if os.path.exists(old_boot_cmd):
+            try: os.remove(old_boot_cmd)
+            except: pass
+
+        content = """DEPENDS += "u-boot-tools-native"
 
 do_compile:append() {
     echo "bootlimit=3" >> ${B}/u-boot-initial-env
     echo "bootcount=0" >> ${B}/u-boot-initial-env
     echo "upgrade_available=0" >> ${B}/u-boot-initial-env
-    
     echo "BOOT_ORDER=A B" >> ${B}/u-boot-initial-env
     echo "BOOT_A_LEFT=3" >> ${B}/u-boot-initial-env
     echo "BOOT_B_LEFT=0" >> ${B}/u-boot-initial-env
@@ -300,6 +300,65 @@ do_deploy:append() {
         with open(os.path.join(uboot_dir, "u-boot_%.bbappend"), "w") as f: 
             f.write(content.strip())
 
+    def create_rpi_uboot_scr_bbappend(self):
+        poky_dir = self.root_app.poky_path.get()
+        if not poky_dir: return
+        
+        layer_path = os.path.join(poky_dir, "meta-yoctool")
+        scr_dir = os.path.join(layer_path, "recipes-bsp", "rpi-u-boot-scr")
+        files_dir = os.path.join(scr_dir, "files")
+        os.makedirs(files_dir, exist_ok=True)
+        
+        bad_bbappend = os.path.join(scr_dir, "rpi-u-boot-scr_%.bbappend")
+        if os.path.exists(bad_bbappend):
+            try: os.remove(bad_bbappend)
+            except: pass
+            
+        boot_cmd_content = """test -n "${BOOT_ORDER}" || setenv BOOT_ORDER "A B"
+test -n "${BOOT_A_LEFT}" || setenv BOOT_A_LEFT 3
+test -n "${BOOT_B_LEFT}" || setenv BOOT_B_LEFT 3
+
+setenv boot_part ""
+for target in ${BOOT_ORDER}; do
+    if test "${boot_part}" = ""; then
+        if test "${target}" = "A"; then
+            if test ${BOOT_A_LEFT} -gt 0; then
+                setenv boot_part "2"
+                setenv rauc_slot "A"
+                setexpr BOOT_A_LEFT ${BOOT_A_LEFT} - 1
+            fi
+        elif test "${target}" = "B"; then
+            if test ${BOOT_B_LEFT} -gt 0; then
+                setenv boot_part "3"
+                setenv rauc_slot "B"
+                setexpr BOOT_B_LEFT ${BOOT_B_LEFT} - 1
+            fi
+        fi
+    fi
+done
+
+saveenv
+
+if test "${boot_part}" = ""; then
+    setenv BOOT_ORDER "A B"
+    setenv BOOT_A_LEFT 3
+    setenv BOOT_B_LEFT 3
+    saveenv
+    reset
+fi
+
+setenv bootargs "console=ttyS0,115200 root=/dev/mmcblk0p${boot_part} rootfstype=ext4 rootwait rauc.slot=${rauc_slot}"
+fatload mmc 0:1 ${kernel_addr_r} @@KERNEL_IMAGETYPE@@
+@@KERNEL_BOOTCMD@@ ${kernel_addr_r} - ${fdt_addr}
+"""
+        with open(os.path.join(files_dir, "boot.cmd.in"), "w") as f: 
+            f.write(boot_cmd_content.strip())
+
+        content = """FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+"""
+        with open(os.path.join(scr_dir, "rpi-u-boot-scr.bbappend"), "w") as f: 
+            f.write(content.strip())
+
     def create_kernel_bbappend(self):
         poky_dir = self.root_app.poky_path.get()
         if not poky_dir: return
@@ -309,8 +368,7 @@ do_deploy:append() {
         files_dir = os.path.join(kernel_dir, "files")
         os.makedirs(files_dir, exist_ok=True)
         
-        cfg_content = """
-CONFIG_BLK_DEV_LOOP=y
+        cfg_content = """CONFIG_BLK_DEV_LOOP=y
 CONFIG_SQUASHFS=y
 CONFIG_SQUASHFS_FILE_CACHE=y
 CONFIG_SQUASHFS_FILE_DIRECT=y
@@ -322,8 +380,7 @@ CONFIG_SQUASHFS_XZ=y
         with open(os.path.join(files_dir, "rauc.cfg"), "w") as f:
             f.write(cfg_content.strip())
             
-        bbappend_content = """
-FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+        bbappend_content = """FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 SRC_URI += "file://rauc.cfg"
 """
         with open(os.path.join(kernel_dir, "linux-raspberrypi_%.bbappend"), "w") as f:
@@ -338,8 +395,7 @@ SRC_URI += "file://rauc.cfg"
         os.makedirs(recipes_dir, exist_ok=True)
         
         bundle_bb = os.path.join(recipes_dir, "update-bundle.bb")
-        content = """
-DESCRIPTION = "RAUC Update Bundle"
+        content = """DESCRIPTION = "RAUC Update Bundle"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
@@ -352,7 +408,7 @@ RAUC_BUNDLE_FORMAT = "plain"
 
 RAUC_BUNDLE_SLOTS = "rootfs" 
 RAUC_SLOT_rootfs = "${RAUC_TARGET_IMAGE}"
-RAUC_SLOT_rootfs[fstype] = "tar.gz"
+RAUC_SLOT_rootfs[fstype] = "ext4"
 
 RAUC_KEY_FILE = "${RAUC_KEY_FILE_REAL}"
 RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
@@ -366,6 +422,7 @@ RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
         self.create_rauc_config()
         self.create_bundle_recipe()
         self.create_uboot_bbappend()
+        self.create_rpi_uboot_scr_bbappend()
         self.create_kernel_bbappend()
         
         project_root = os.getcwd()
@@ -390,7 +447,7 @@ RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
         lines.append('PACKAGECONFIG:append:pn-rauc = " uboot"\n')
         
         lines.append('DISTRO_FEATURES:append = " rauc"\n')
-        lines.append('IMAGE_INSTALL:append = " rauc rpi-rauc-conf libubootenv-bin e2fsprogs-mke2fs"\n')
+        lines.append('IMAGE_INSTALL:append = " rauc rpi-rauc-conf libubootenv-bin e2fsprogs-mke2fs dosfstools"\n')
         
         if wks_file: lines.append(f'WKS_FILE = "{wks_file}"\n')
         
@@ -403,8 +460,7 @@ RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
         
         lines.append('IMAGE_BOOT_FILES:append = " uboot.env"\n')
         
-        lines.append('IMAGE_FSTYPES:append = " wic.bz2"\n')
-        lines.append('IMAGE_FSTYPES:append = " tar.gz"\n')
+        lines.append('IMAGE_FSTYPES:append = " wic.bz2 ext4"\n')
         
         lines.append('SYSTEMD_AUTO_ENABLE:pn-systemd-growfs = "disable"\n')
         lines.append('IMAGE_FEATURES:remove = "read-only-rootfs"\n')
