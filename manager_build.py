@@ -21,6 +21,18 @@ class BuildManager:
             self.app.set_busy_state(True)
             threading.Thread(target=self.run_clean).start()
 
+    def start_cleansstate_thread(self):
+        if not self.app.poky_path.get(): return
+        if messagebox.askyesno("Confirm", "Clean sstate? This removes shared state cache for the image.\nFull rebuild will be slower."):
+            self.app.set_busy_state(True)
+            threading.Thread(target=self.run_cleansstate).start()
+
+    def start_clear_cache_thread(self):
+        if not self.app.poky_path.get(): return
+        if messagebox.askyesno("Confirm", "Clear global cache (tmp, sstate-cache, cache)?\n\nThis will force a full rebuild, but keeps your downloaded sources intact."):
+            self.app.set_busy_state(True)
+            threading.Thread(target=self.run_clear_cache).start()
+
     def start_specific_build(self, target):
         if not self.app.poky_path.get(): return
         self.app.set_busy_state(True)
@@ -29,7 +41,6 @@ class BuildManager:
     def install_dependencies(self):
         self.app.log("Checking and installing host dependencies...")
         
-        # FIX: Updated package names for modern Ubuntu/Debian
         pkgs = [
             "gawk", "wget", "git", "diffstat", "unzip", "texinfo", "gcc", "build-essential",
             "chrpath", "socat", "cpio", "python3", "python3-pip", "python3-pexpect",
@@ -44,14 +55,11 @@ class BuildManager:
         env["DEBIAN_FRONTEND"] = "noninteractive"
         
         try:
-            # Run update first to ensure package lists are fresh
             subprocess.run(cmd_update, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
             
-            # Run install
             proc = subprocess.run(cmd_install, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             
             if proc.returncode != 0:
-                # Retry once if lock file error
                 if "Could not get lock" in proc.stderr:
                     self.app.log("Apt locked. Retrying in 5s...")
                     time.sleep(5)
@@ -154,6 +162,21 @@ class BuildManager:
             self.install_dependencies()
             self.app.log("Cleaning...")
             self.exec_user_cmd(f"bitbake -c cleanall {self.app.tab_general.image_var.get()}")
+        finally:
+            self.app.root.after(0, self.app.set_busy_state, False)
+
+    def run_cleansstate(self):
+        try:
+            self.install_dependencies()
+            self.app.log("Cleaning sstate...")
+            self.exec_user_cmd(f"bitbake -c cleansstate {self.app.tab_general.image_var.get()}")
+        finally:
+            self.app.root.after(0, self.app.set_busy_state, False)
+
+    def run_clear_cache(self):
+        try:
+            self.app.log("Clearing global Yocto cache (tmp, sstate-cache, cache)...")
+            self.exec_user_cmd("rm -rf tmp sstate-cache cache")
         finally:
             self.app.root.after(0, self.app.set_busy_state, False)
 

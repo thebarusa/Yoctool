@@ -6,13 +6,11 @@ import re
 import subprocess
 import multiprocessing
 
-# --- UI Configs ---
 import config_general
 import config_image
 import config_ota
 import config_rpi
 
-# --- Functional Managers ---
 import manager_setup
 import manager_build
 import manager_sdcard
@@ -26,7 +24,6 @@ class YoctoolApp:
         self.root.title(f"Yoctool {self.APP_VERSION} - Yocto Image Builder")
         self.root.geometry("950x900")
 
-        # Global State Variables
         self.poky_path = tk.StringVar()
         self.build_dir_name = tk.StringVar(value="build")
         self.selected_drive = tk.StringVar()
@@ -38,7 +35,6 @@ class YoctoolApp:
         if not self.sudo_user:
             self.sudo_user = "root"
 
-        # Initialize Config Tabs
         self.tab_rpi = config_rpi.RpiTab(self)
         self.board_managers = [self.tab_rpi]
         self.active_manager = self.board_managers[0] 
@@ -53,7 +49,6 @@ class YoctoolApp:
         
         self.config_file = os.path.expanduser("~/.yoctool_config")
 
-        # Initialize Managers (Pass 'self' to allow access to UI/State)
         self.mgr_setup = manager_setup.SetupManager(self)
         self.mgr_build = manager_build.BuildManager(self)
         self.mgr_sdcard = manager_sdcard.SDCardManager(self)
@@ -61,7 +56,6 @@ class YoctoolApp:
         self.create_menu()
         self.create_widgets()
         
-        # Initial Load
         self.mgr_setup.load_saved_path()
         self.log(f"Tool initialized. CPU Cores detected: {multiprocessing.cpu_count()}")
 
@@ -103,7 +97,6 @@ class YoctoolApp:
         ttk.Label(frame_setup, text="Poky Path:").grid(row=0, column=0, padx=5, pady=10, sticky="e")
         ttk.Entry(frame_setup, textvariable=self.poky_path, width=60).grid(row=0, column=1, padx=5, pady=10, sticky="ew")
         
-        # Call Setup Manager
         ttk.Button(frame_setup, text="Browse", command=self.mgr_setup.browse_folder).grid(row=0, column=2, padx=5, pady=10)
         ttk.Button(frame_setup, text="Download Poky", command=self.mgr_setup.open_download_dialog).grid(row=0, column=3, padx=5, pady=10)
         frame_setup.columnconfigure(1, weight=1)
@@ -125,7 +118,6 @@ class YoctoolApp:
         frame_cfg_btns = ttk.Frame(frame_config)
         frame_cfg_btns.pack(pady=10)
         
-        # Call Setup Manager for Load/Save
         self.btn_load = ttk.Button(frame_cfg_btns, text="LOAD CONFIG", command=self.mgr_setup.load_config)
         self.btn_load.pack(side="left", padx=10)
         self.btn_save = ttk.Button(frame_cfg_btns, text="APPLY & SAVE", command=self.mgr_setup.save_config)
@@ -141,7 +133,6 @@ class YoctoolApp:
                 self.active_manager = mgr
 
     def start_specific_build(self, target):
-        # Wrapper to be called from OTATab
         self.mgr_build.start_specific_build(target)
 
     def _setup_operations_section(self):
@@ -156,11 +147,14 @@ class YoctoolApp:
         f_build_btns = ttk.Frame(frame_build)
         f_build_btns.pack(pady=15, padx=10)
         
-        # Call Build Manager
         self.btn_build = ttk.Button(f_build_btns, text="START BUILD", command=self.mgr_build.start_build_thread)
         self.btn_build.pack(side="left", padx=10)
         self.btn_clean = ttk.Button(f_build_btns, text="CLEAN BUILD", command=self.mgr_build.start_clean_thread)
         self.btn_clean.pack(side="left", padx=10)
+        self.btn_cleansstate = ttk.Button(f_build_btns, text="CLEAN STATE", command=self.mgr_build.start_cleansstate_thread)
+        self.btn_cleansstate.pack(side="left", padx=10)
+        self.btn_clear_cache = ttk.Button(f_build_btns, text="CLEAR CACHE", command=self.mgr_build.start_clear_cache_thread)
+        self.btn_clear_cache.pack(side="left", padx=10)
 
         frame_flash = ttk.LabelFrame(frame_top, text=" 4. SD Card & Logs ")
         frame_flash.pack(side="left", fill="both", expand=True, padx=(5, 0))
@@ -170,7 +164,6 @@ class YoctoolApp:
         self.drive_menu = ttk.Combobox(f_flash_ctrl, textvariable=self.selected_drive, width=15, state="readonly")
         self.drive_menu.pack(side="left", padx=5, fill="x", expand=True)
         
-        # Call SDCard Manager
         ttk.Button(f_flash_ctrl, text="↻", width=3, command=self.mgr_sdcard.scan_drives).pack(side="left", padx=2)
         
         self.btn_format = ttk.Button(f_flash_ctrl, text="FORMAT", command=self.mgr_sdcard.format_drive)
@@ -208,7 +201,6 @@ class YoctoolApp:
         self.log_area = scrolledtext.ScrolledText(frame_log, height=12, bg="black", fg="white", font=("Courier New", 10))
         self.log_area.pack(fill="both", expand=True, padx=5, pady=5)
 
-    # --- Shared Utility Methods ---
     def log(self, msg):
         self.root.after(0, self._log_safe, msg)
 
@@ -228,6 +220,9 @@ class YoctoolApp:
         state = "disabled" if busy else "normal"
         self.btn_build.config(state=state)
         self.btn_clean.config(state=state)
+        self.btn_cleansstate.config(state=state)
+        if hasattr(self, 'btn_clear_cache'):
+            self.btn_clear_cache.config(state=state)
         self.btn_format.config(state=state)
         self.btn_flash.config(state=state)
         self.btn_load.config(state=state)
