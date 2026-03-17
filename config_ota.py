@@ -415,6 +415,23 @@ RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
 """
         with open(bundle_bb, "w") as f: f.write(content.strip() + "\n")
 
+    def create_base_files_bbappend(self):
+        poky_dir = self.root_app.poky_path.get()
+        if not poky_dir: return
+        
+        layer_path = os.path.join(poky_dir, "meta-yoctool")
+        recipe_dir = os.path.join(layer_path, "recipes-core", "base-files")
+        os.makedirs(recipe_dir, exist_ok=True)
+        
+        content = """do_install:append() {
+    if ! grep -q "/boot" ${D}${sysconfdir}/fstab; then
+        echo "/dev/mmcblk0p1 /boot vfat defaults,rw,sync 0 0" >> ${D}${sysconfdir}/fstab
+    fi
+}
+"""
+        with open(os.path.join(recipe_dir, "base-files_%.bbappend"), "w") as f:
+            f.write(content)
+
     def get_config_lines(self):
         if not self.enable_rauc.get(): return []
         
@@ -424,6 +441,7 @@ RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
         self.create_uboot_bbappend()
         self.create_rpi_uboot_scr_bbappend()
         self.create_kernel_bbappend()
+        self.create_base_files_bbappend()
         
         project_root = os.getcwd()
         key_dir = os.path.join(project_root, "rauc-keys")

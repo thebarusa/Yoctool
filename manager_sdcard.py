@@ -3,7 +3,7 @@ import threading
 import os
 import shlex
 import glob
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 
 class SDCardManager:
     def __init__(self, app):
@@ -146,53 +146,4 @@ class SDCardManager:
             self.app.root.after(0, lambda: self.app.pb_canvas.itemconfig(self.app.pb_rect, fill="#FF0000"))
             self.app.root.after(0, messagebox.showerror, "Error", str(e))
         finally: 
-             self.app.root.after(0, self.app.set_busy_state, False)
-
-    def extract_logs(self):
-        sel = self.app.selected_drive.get()
-        if not sel or "No devices" in sel: return
-        
-        dev_name = sel.split()[0]
-        dev_path = f"/dev/{dev_name}"
-        
-        if "mmcblk" in dev_name: part_path = f"{dev_path}p2"
-        else: part_path = f"{dev_path}2"
-
-        mount_point = "/tmp/yoctool_mnt"
-        os.makedirs(mount_point, exist_ok=True)
-
-        try:
-            self.app.log(f"Mounting {part_path} to {mount_point}...")
-            subprocess.run(f"mount {part_path} {mount_point}", shell=True, check=True)
-            
-            initial_dir = os.path.join(mount_point, "var/log/journal")
-            if not os.path.exists(initial_dir): initial_dir = mount_point
-            
-            src_file = filedialog.askopenfilename(title="Select system.journal file", 
-                                                initialdir=initial_dir,
-                                                filetypes=[("Journal files", "*.journal"), ("All files", "*.*")])
-            
-            if src_file:
-                real_user = os.environ.get('SUDO_USER') or os.environ.get('USER')
-                home_dir = f"/home/{real_user}" if real_user and real_user != "root" else os.path.expanduser("~")
-                
-                dest_file = filedialog.asksaveasfilename(title="Save Log As",
-                                                       initialdir=home_dir,
-                                                       defaultextension=".txt",
-                                                       filetypes=[("Text files", "*.txt")])
-                if dest_file:
-                    self.app.log(f"Converting {src_file} to {dest_file}...")
-                    cmd = f"journalctl --file={shlex.quote(src_file)} --no-pager > {shlex.quote(dest_file)}"
-                    subprocess.run(cmd, shell=True, check=True)
-                    
-                    if real_user and real_user != "root":
-                        subprocess.run(f"chown {real_user}:{real_user} {shlex.quote(dest_file)}", shell=True)
-                        
-                    self.app.log("Log extracted successfully.")
-                    messagebox.showinfo("Success", f"Log extracted to {dest_file}")
-
-        except Exception as e:
-            self.app.log(f"Error extracting logs: {e}")
-            messagebox.showerror("Error", f"Failed: {e}")
-        finally:
-            subprocess.run(f"umount {mount_point}", shell=True)
+            self.app.root.after(0, self.app.set_busy_state, False)

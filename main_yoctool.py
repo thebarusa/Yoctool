@@ -156,7 +156,7 @@ class YoctoolApp:
         self.btn_clear_cache = ttk.Button(f_build_btns, text="CLEAR CACHE", command=self.mgr_build.start_clear_cache_thread)
         self.btn_clear_cache.pack(side="left", padx=10)
 
-        frame_flash = ttk.LabelFrame(frame_top, text=" 4. SD Card & Logs ")
+        frame_flash = ttk.LabelFrame(frame_top, text=" 4. SD Card ")
         frame_flash.pack(side="left", fill="both", expand=True, padx=(5, 0))
         
         f_flash_ctrl = ttk.Frame(frame_flash)
@@ -171,9 +171,6 @@ class YoctoolApp:
         
         self.btn_flash = ttk.Button(f_flash_ctrl, text="FLASH", command=self.mgr_sdcard.flash_image)
         self.btn_flash.pack(side="left", padx=5)
-        
-        self.btn_extract = ttk.Button(f_flash_ctrl, text="GET LOGS", command=self.mgr_sdcard.extract_logs)
-        self.btn_extract.pack(side="left", padx=5)
 
         frame_progress = ttk.Frame(frame_ops)
         frame_progress.pack(side="top", fill="x", padx=0, pady=(5, 10))
@@ -227,7 +224,6 @@ class YoctoolApp:
         self.btn_flash.config(state=state)
         self.btn_load.config(state=state)
         self.btn_save.config(state=state)
-        self.btn_extract.config(state=state)
 
 if __name__ == "__main__":
     if os.geteuid() != 0:
