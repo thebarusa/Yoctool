@@ -17,15 +17,9 @@ class BuildManager:
 
     def start_clean_thread(self):
         if not self.app.poky_path.get(): return
-        if messagebox.askyesno("Confirm", "Clean build?"):
+        if messagebox.askyesno("Confirm", "Clean build (cleanall)? This removes the working directory, shared state cache, and downloaded sources for this image."):
             self.app.set_busy_state(True)
             threading.Thread(target=self.run_clean).start()
-
-    def start_cleansstate_thread(self):
-        if not self.app.poky_path.get(): return
-        if messagebox.askyesno("Confirm", "Clean sstate? This removes shared state cache for the image.\nFull rebuild will be slower."):
-            self.app.set_busy_state(True)
-            threading.Thread(target=self.run_cleansstate).start()
 
     def start_clear_cache_thread(self):
         if not self.app.poky_path.get(): return
@@ -160,16 +154,8 @@ class BuildManager:
     def run_clean(self):
         try:
             self.install_dependencies()
-            self.app.log("Cleaning...")
+            self.app.log("Cleaning build (cleanall)...")
             self.exec_user_cmd(f"bitbake -c cleanall {self.app.tab_general.image_var.get()}")
-        finally:
-            self.app.root.after(0, self.app.set_busy_state, False)
-
-    def run_cleansstate(self):
-        try:
-            self.install_dependencies()
-            self.app.log("Cleaning sstate...")
-            self.exec_user_cmd(f"bitbake -c cleansstate {self.app.tab_general.image_var.get()}")
         finally:
             self.app.root.after(0, self.app.set_busy_state, False)
 

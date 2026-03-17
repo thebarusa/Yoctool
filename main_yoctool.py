@@ -151,8 +151,6 @@ class YoctoolApp:
         self.btn_build.pack(side="left", padx=10)
         self.btn_clean = ttk.Button(f_build_btns, text="CLEAN BUILD", command=self.mgr_build.start_clean_thread)
         self.btn_clean.pack(side="left", padx=10)
-        self.btn_cleansstate = ttk.Button(f_build_btns, text="CLEAN STATE", command=self.mgr_build.start_cleansstate_thread)
-        self.btn_cleansstate.pack(side="left", padx=10)
         self.btn_clear_cache = ttk.Button(f_build_btns, text="CLEAR CACHE", command=self.mgr_build.start_clear_cache_thread)
         self.btn_clear_cache.pack(side="left", padx=10)
 
@@ -217,7 +215,6 @@ class YoctoolApp:
         state = "disabled" if busy else "normal"
         self.btn_build.config(state=state)
         self.btn_clean.config(state=state)
-        self.btn_cleansstate.config(state=state)
         if hasattr(self, 'btn_clear_cache'):
             self.btn_clear_cache.config(state=state)
         self.btn_format.config(state=state)
