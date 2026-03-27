@@ -126,28 +126,12 @@ class BuildManager:
             self.app.mgr_setup.regenerate_bblayers()
             self.check_and_download_layers()
             
-            needs_clean = False
-            if hasattr(self.app.tab_ota, 'apply_mender_fixes'):
-                needs_clean = self.app.tab_ota.apply_mender_fixes()
-
             build_target = target if target else self.app.tab_general.image_var.get()
             self.app.log(f"Building {build_target}...")
             
             cmd = f"bitbake {build_target}"
-            
-            if needs_clean:
-                self.app.log("Applying Cleanall on U-Boot to ensure fix works...")
-                cmd = f"bitbake -c cleanall u-boot && {cmd}"
                 
             self.exec_user_cmd(cmd)
-
-            if hasattr(self.app.tab_ota, 'ota_mode') and \
-               self.app.tab_ota.ota_mode.get() == "RAUC" and target is None:
-                self.app.log("-" * 40)
-                self.app.log("[INFO] RAUC Mode Active:")
-                self.app.log("1. Flash the generated .wic file to SD Card.")
-                self.app.log("2. Go to OTA Tab and click 'BUILD RAUC BUNDLE' to create update file.")
-                self.app.log("-" * 40)
         finally:
             self.app.root.after(0, self.app.set_busy_state, False)
 

@@ -83,7 +83,7 @@ sudo apt-get install gawk wget git diffstat unzip texinfo gcc build-essential \
 ### Starting the Application
 ```bash
 # Run with sudo for full functionality (especially for flashing)
-sudo python3 yocto_tool.py
+sudo python3 main_yoctool.py
 ```
 
 ### First-Time Setup
@@ -137,8 +137,14 @@ sudo python3 yocto_tool.py
 
 ```
 YoctoTool/
-├── yocto_tool.py          # Main application
-├── manager_rpi.py         # Raspberry Pi configuration manager
+├── main_yoctool.py        # Main application
+├── config_general.py      # General settings tab
+├── config_image.py        # Image features tab
+├── config_ota.py          # OTA/RAUC tab
+├── config_rpi.py          # Raspberry Pi options tab + recipe generators
+├── manager_setup.py       # Load/save config + Poky downloader
+├── manager_build.py       # Build/clean/cache/layer manager
+├── manager_sdcard.py      # SD card scan/format/flash manager
 ├── README.md              # This file
 ├── .gitignore             # Git ignore rules
 └── poky/                  # Yocto Poky repository (downloaded)
@@ -150,7 +156,7 @@ YoctoTool/
 ## Configuration Files
 
 ### User Config File
-- **Location**: `~/.yocto_tool_config`
+- **Location**: `~/.yoctool_config`
 - **Purpose**: Stores last used Poky path
 - **Format**: Plain text, single line
 
@@ -163,7 +169,7 @@ YoctoTool/
 
 ### Permission Errors
 - **Issue**: Cannot flash to SD card
-- **Solution**: Run with `sudo python3 yocto_tool.py`
+- **Solution**: Run with `sudo python3 main_yoctool.py`
 
 ### Build Failures
 - **Issue**: Build fails with dependency errors
@@ -199,13 +205,13 @@ YoctoTool/
 ## Development
 
 ### Adding New Features
-1. Edit `yocto_tool.py` for core functionality
-2. Edit `manager_rpi.py` for Raspberry Pi-specific features
-3. Test with `python3 -m py_compile yocto_tool.py`
+1. Edit `main_yoctool.py` for core UI and app wiring
+2. Edit the relevant `config_*.py` or `manager_*.py` module for feature logic
+3. Test with `python3 -m py_compile main_yoctool.py`
 
 ### Code Structure
-- **YoctoBuilderApp**: Main application class
-- **RpiManager**: Raspberry Pi configuration handler (in `manager_rpi.py`)
+- **YoctoolApp**: Main application class
+- **RpiTab**: Raspberry Pi configuration handler (in `config_rpi.py`)
 - **Progress Tracking**: Canvas-based custom progress bar with automatic updates
 
 ## Version History

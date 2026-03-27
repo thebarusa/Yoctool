@@ -14,6 +14,7 @@ import config_rpi
 import manager_setup
 import manager_build
 import manager_sdcard
+import update_yoctool
 
 class YoctoolApp:
     def __init__(self, root):
@@ -79,7 +80,7 @@ class YoctoolApp:
         self.root.config(menu=menubar)
 
     def check_update(self):
-        pass 
+        update_yoctool.check_for_update(self.root, self.APP_VERSION)
 
     def show_about(self):
         messagebox.showinfo("About", f"Yoctool\nVersion: {self.APP_VERSION}\nAuthor: Hungnt8687")

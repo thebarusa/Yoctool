@@ -68,7 +68,7 @@ def _check_update_thread(root, current_version):
                 if download_url:
                     download_popup(root, download_url, latest_version)
                 else:
-                    messagebox.warning("Error", "No asset found.")
+                    messagebox.showwarning("Error", "No asset found.")
         
         root.after(0, ask_user)
 
