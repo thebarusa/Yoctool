@@ -49,13 +49,13 @@ rm -f yoctool.spec
 
 echo "Building executable..."
 # PyInstaller sẽ tạo file có tên nằm trong biến $EXE_NAME (ví dụ Yoctool_v1.0.0)
-# Lưu ý: Script chính giờ là main_yoctool.py
+# Lưu ý: Script chính giờ là main.py
 pyinstaller --onefile \
     --name="$EXE_NAME" \
     --windowed \
     --clean \
     --icon=NONE \
-    main_yoctool.py
+    main.py
 
 # ---------------------------------------------------------
 # Step 5: Teardown & Verify

@@ -82,8 +82,8 @@ sudo apt-get install gawk wget git diffstat unzip texinfo gcc build-essential \
 
 ### Starting the Application
 ```bash
-# Run with sudo for full functionality (especially for flashing)
-sudo python3 main_yoctool.py
+# The app will prompt with pkexec when elevated privileges are needed
+python3 main.py
 ```
 
 ### First-Time Setup
@@ -137,7 +137,7 @@ sudo python3 main_yoctool.py
 
 ```
 YoctoTool/
-├── main_yoctool.py        # Main application
+├── main.py               # Main application
 ├── config_general.py      # General settings tab
 ├── config_image.py        # Image features tab
 ├── config_ota.py          # OTA/RAUC tab
@@ -169,7 +169,7 @@ YoctoTool/
 
 ### Permission Errors
 - **Issue**: Cannot flash to SD card
-- **Solution**: Run with `sudo python3 main_yoctool.py`
+- **Solution**: Start the app with `python3 main.py` and approve the `pkexec` prompt
 
 ### Build Failures
 - **Issue**: Build fails with dependency errors
@@ -205,9 +205,9 @@ YoctoTool/
 ## Development
 
 ### Adding New Features
-1. Edit `main_yoctool.py` for core UI and app wiring
+1. Edit `main.py` for core UI and app wiring
 2. Edit the relevant `config_*.py` or `manager_*.py` module for feature logic
-3. Test with `python3 -m py_compile main_yoctool.py`
+3. Test with `python3 -m py_compile main.py`
 
 ### Code Structure
 - **YoctoolApp**: Main application class

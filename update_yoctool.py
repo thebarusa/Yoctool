@@ -159,8 +159,8 @@ def run_linux_updater(new_dir, new_exe_name):
         # Dev mode fallback
         current_exe = os.path.abspath(sys.argv[0])
         app_dir = os.path.dirname(current_exe)
-        old_exe_name = "main_yoctool.py"
-        new_exe_name = "main_yoctool.py" 
+        old_exe_name = "main.py"
+        new_exe_name = "main.py" 
         restart_cmd = f'python3 "{os.path.join(app_dir, new_exe_name)}" &'
 
     script_path = os.path.join(tempfile.gettempdir(), "yoctool_updater.sh")

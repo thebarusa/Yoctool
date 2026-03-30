@@ -5,6 +5,7 @@ import sys
 import re
 import subprocess
 import multiprocessing
+import shutil
 
 import config_general
 import config_image
@@ -223,12 +224,45 @@ class YoctoolApp:
         self.btn_load.config(state=state)
         self.btn_save.config(state=state)
 
+def relaunch_with_pkexec():
+    env_args = []
+    display = os.environ.get("DISPLAY")
+    xauthority = os.environ.get("XAUTHORITY")
+
+    if display:
+        env_args.append(f"DISPLAY={display}")
+    if xauthority:
+        env_args.append(f"XAUTHORITY={xauthority}")
+
+    if getattr(sys, "frozen", False):
+        cmd = ["pkexec", "env", *env_args, sys.executable, *sys.argv[1:]]
+    else:
+        script_path = os.path.abspath(sys.argv[0])
+        cmd = ["pkexec", "env", *env_args, sys.executable, script_path, *sys.argv[1:]]
+
+    try:
+        subprocess.check_call(cmd)
+    except FileNotFoundError:
+        messagebox.showerror(
+            "pkexec Not Found",
+            "pkexec is not installed. Please install polkit and try again.",
+        )
+    except subprocess.CalledProcessError:
+        # User canceled authentication or pkexec returned an error.
+        pass
+
 if __name__ == "__main__":
     if os.geteuid() != 0:
-        try:
-            subprocess.check_call(["sudo", sys.executable] + sys.argv)
-        except subprocess.CalledProcessError:
-            pass
+        if shutil.which("pkexec") is None:
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showerror(
+                "Permission Error",
+                "pkexec is required to run this application with administrator privileges.",
+            )
+            root.destroy()
+        else:
+            relaunch_with_pkexec()
         sys.exit(0)
 
     root = tk.Tk()
