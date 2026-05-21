@@ -153,7 +153,8 @@ class BuildManager:
     def exec_user_cmd(self, cmd):
         safe_poky = shlex.quote(self.app.poky_path.get())
         safe_build = shlex.quote(self.app.build_dir_name.get())
-        full_cmd = f"sudo -u {self.app.sudo_user} bash -c 'cd {safe_poky} && source oe-init-build-env {safe_build} && {cmd}'"
+        safe_user = shlex.quote(self.app.sudo_user)
+        full_cmd = f"sudo -H -u {safe_user} bash -lc 'cd {safe_poky} && source oe-init-build-env {safe_build} && {cmd}'"
         
         self.app.root.after(0, lambda: self.app.pb_canvas.itemconfig(self.app.pb_rect, fill="#4CAF50"))
         

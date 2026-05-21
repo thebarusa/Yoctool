@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import os
+import pwd
 import sys
 import re
 import subprocess
@@ -29,11 +30,10 @@ class YoctoolApp:
         self.poky_path = tk.StringVar()
         self.build_dir_name = tk.StringVar(value="build")
         self.selected_drive = tk.StringVar()
-        
-        self.sudo_user = os.environ.get('SUDO_USER')
+
+        self.sudo_user = self._detect_invoking_user()
         if os.geteuid() != 0:
             messagebox.showwarning("Permission Warning", "Please run with 'sudo' to allow flashing.")
-            if not self.sudo_user: self.sudo_user = os.environ.get('USER')
         if not self.sudo_user:
             self.sudo_user = "root"
 
@@ -60,6 +60,20 @@ class YoctoolApp:
         
         self.mgr_setup.load_saved_path()
         self.log(f"Tool initialized. CPU Cores detected: {multiprocessing.cpu_count()}")
+
+    def _detect_invoking_user(self):
+        sudo_user = os.environ.get("SUDO_USER")
+        if sudo_user:
+            return sudo_user
+
+        pkexec_uid = os.environ.get("PKEXEC_UID")
+        if pkexec_uid:
+            try:
+                return pwd.getpwuid(int(pkexec_uid)).pw_name
+            except (KeyError, ValueError):
+                pass
+
+        return os.environ.get("USER")
 
     def get_version_from_filename(self):
         version = "v1.0.0"
