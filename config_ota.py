@@ -204,13 +204,18 @@ RAUC_CERT_FILE = "${RAUC_CERT_FILE_REAL}"
         
         self.create_bundle_recipe()
         
-        project_root = os.getcwd()
-        key_dir = os.path.join(project_root, "rauc-keys")
+        poky_dir = self.root_app.poky_path.get()
+        project_root = os.path.dirname(poky_dir) if poky_dir else os.getcwd()
+        key_dir_real = os.path.join(project_root, "rauc-keys")
+        cert_path_real = os.path.join(key_dir_real, "development-1.cert.pem")
+        key_path_real = os.path.join(key_dir_real, "development-1.key.pem")
+
+        if not os.path.exists(key_path_real):
+             self.root_app.log("Warning: RAUC Keys not found. Please click 'Generate Keys'.")
+
+        key_dir = "${TOPDIR}/../../rauc-keys"
         cert_path = os.path.join(key_dir, "development-1.cert.pem")
         key_path = os.path.join(key_dir, "development-1.key.pem")
-
-        if not os.path.exists(key_path):
-             self.root_app.log("Warning: RAUC Keys not found. Please click 'Generate Keys'.")
 
         lines = []
         lines.append('\n')
