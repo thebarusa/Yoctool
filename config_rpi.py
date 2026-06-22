@@ -298,11 +298,14 @@ part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --size 128
         rauc_files_dir = os.path.join(rauc_recipe_dir, "files")
         os.makedirs(rauc_files_dir, exist_ok=True)
 
-        project_root = os.getcwd()
+        project_root = os.path.dirname(poky_dir)
         cert_src = os.path.join(project_root, "rauc-keys", "development-1.cert.pem")
         cert_dest = os.path.join(rauc_files_dir, "development-1.cert.pem")
         if os.path.exists(cert_src):
             shutil.copy(cert_src, cert_dest)
+        else:
+            self.root_app.log(f"Warning: RAUC certificate not found at {cert_src}. "
+                               "The generated image may not include the keyring needed for update verification.")
 
         machine = self.root_app.tab_general.machine_var.get()
         sys_conf_content = f"""[system]

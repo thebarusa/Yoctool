@@ -149,7 +149,8 @@ class OTATab:
         return True
 
     def generate_keys(self):
-        project_root = os.getcwd()
+        poky_dir = self.root_app.poky_path.get()
+        project_root = os.path.dirname(poky_dir) if poky_dir else os.getcwd()
         key_dir = os.path.join(project_root, "rauc-keys")
         if not os.path.exists(key_dir): os.makedirs(key_dir)
         
